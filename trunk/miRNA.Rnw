@@ -62,7 +62,7 @@ This analysis was revisited with the following objectives:
 <<loadSeqs,echo=F,results=hide>>=
 seqs<-read.table("allSeqs.txt")
 
-runs<-data.frame(run=c('FGC0042S1','FGC0031S8','FGC0036S1','FGC0036S2'),desc=c('Normal retina','WERI with barcode GTCT (Retinoblastoma cell line)','Y-79 without barcode  (Retinoblastoma cell line)','Y-79 + WERI with barcode  (Retinoblastoma cell line)'),size=c(4787704,5821153,5877018,5897869))
+runs<-data.frame(run=c('FGC0042S1','FGC0031S8','FGC0036S1','FGC0036S2'),desc=c('Normal retina','WERI with barcode GTCT (Retinoblastoma)','Y-79 without barcode (Retinoblastoma)','Y-79 + WERI with barcode (Retinoblastoma)'),size=c(4787704,5821153,5877018,5897869))
 @
 Four Solexa runs were conducted:
 \begin{enumerate}
