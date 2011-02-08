@@ -252,7 +252,7 @@ print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
 <<makeFasta,echo=F>>=
 attach(seqs)
 
-write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal' &  expLane=='FGC0042-2')],sep="/")),file="normals.fa",format="fasta")
+write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal' &  expLane=='FGC0042-1')],sep="/")),file="normals.fa",format="fasta")
 write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='WERI'   &  expLane=='FGC0036-2')],sep="/")),file="WERI_36.fa",format="fasta")
 @
 
