@@ -248,6 +248,13 @@ myXtableTwo<-xtable(seqTabulation,type=tex,caption=paste("Distinct sequences by 
 print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
 @
 
+\subsection{Against mature miRNAs}
+<<makeFasta,echo=F>>=
+attach(seqs)
+
+write.XStringSet(read.DNAStringSet(filePath[which(sample=='normal' &  expLane=='FGC0042-2')]),file="normals.fa",format="fasta")
+write.XStringSet(read.DNAStringSet(filePath[which(sample=='WERI'   &  expLane=='FGC0036-2')]),file="WERI_36.fa",format="fasta")
+@
 
 
 \begin{thebibliography}{100}	% start the bibliography
