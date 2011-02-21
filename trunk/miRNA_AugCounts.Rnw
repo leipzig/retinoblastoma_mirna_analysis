@@ -8,7 +8,7 @@
 \lhead{\fancyplain{}{\thepage}}
 \chead{}
 \rhead{\fancyplain{}{\bfseries miRNA Reanalyis}}
-\rfoot{$Rev: $}
+\rfoot{$Rev$}
 \cfoot{}
 \lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
 
