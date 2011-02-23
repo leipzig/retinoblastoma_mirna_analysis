@@ -7,7 +7,7 @@
 \pagestyle{fancyplain}
 \lhead{\fancyplain{}{\thepage}}
 \chead{}
-\rhead{\fancyplain{}{\bfseries miRNA Reanalyis}}
+\rhead{\fancyplain{}{\bfseries miRNA Reanalysis}}
 \rfoot{$Rev$}
 \cfoot{}
 \lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
@@ -142,9 +142,9 @@ with following columns
 No spreadsheets were produced comparing normal with retinoblastoma samples.
 
 
-\subsection{DESeq}
+\subsection{EdgeR}
 A reanalysis of the Schug's count data was performed using the
-R-based RNA-Seq analysis package DESeq \cite{Anders} in order to
+R-based RNA-Seq analysis package EdgeR \cite{Robinson} in order to
 detect differential expression between normal and retinoblastoma cells.
 
 This is a comparison of
@@ -154,23 +154,15 @@ and
 \Sexpr{samp2}
 \end{verbatim}
 
-To deal with a lack of replicates, DESeq uses variability of
-normalized gene counts with similar means, under the assumption that
-most genes are not differentially expressed
-(\href{http://seqanswers.com/forums/showthread.php?t=7325}{seqanswers post}). This might not be the best assumption for miRNAs.
+EdgeR does not specifically address the ``no replicates'' problem, but
+it does offer means of setting the common dispersion to any arbitrary
+value and methods of setting per-gene dispersions on a post-hoc basis.
+
+We can use the common dispersion to set our data to a value that is consistent
+with other RNA-Seq experiments.
 
 
-\begin{quote}
-uses the negative binomial distribution, with variance and mean linked by local regression, to model the null distribution of the count data. The method controls type-I error and provides good detection power. "
-\end{quote}
-
-Due to the lack of replicates in this data set, a "blind" method of variance estimation must be used. This approach is described by Simon Anders:
-\begin{quote}
-[experiments without replicates] are often undertaken, especially in HTS, and the DESeq package can deal with them, even though the soundness of the results may depend very much on the circumstances.
-Our primary assumption is still that the mean is a good predictor for the variance. Hence, if a number of genes with similar expression level are compared between replicates, we expect that their variation is of comparable magnitude. Once we accept this assumption, we may argue as follows: Given two samples from different conditions and a number of genes with comparable expression levels, of which we expect only a minority to be influenced by the condition, we may take the variance estimated from comparing their count rates across conditions as ersatz for a proper estimate of the variance across replicates. After all, we assume most genes to behave the same within replicates as across conditions, and hence, the estimated variance should not change too much due to the influence of the hopefully few differentially expressed genes. Furthermore, the differentially expressed genes will only cause the variance estimate to be too high, so that the test will err to the side of being too conservative, i.e., we only lose power.
-\end{quote}
-
-<<deseqAugCounts,echo=F>>=
+<<augCounts,echo=F>>=
 augCounts<-read.csv(paste(gangulyRoot,"read_counts_all_combo.mirAugCounts.csv",sep="/"),stringsAsFactors=FALSE)
 augCounts<-augCounts[-1,]
 normalCounts<-read.csv(paste(gangulyRoot,"all_variations_FGC0042-1_NOBC.mirAugCounts.csv",sep="/"),stringsAsFactors=FALSE)
@@ -222,46 +214,58 @@ and \Sexpr{nrow(summarized.rb)} from  \begin{verbatim}\Sexpr{samp1}\end{verbatim
 \Sexpr{nrow(summarized)} genes.
 
 \subsubsection{Normalization}
-DESeq can accept library sizes (referred here as the library method) to adjust for size factors, or can
+EdgeR can accept library sizes (referred here as the library method) to adjust for size factors, or can
 estimate these sizes based on the input data (estimate method).
 
 Another option is to use the RPM counts provided by Schug and set the
 library sizes equal (RPM method)
 
 In this report we have used the \Sexpr{useLibs} method.
-<<deSetup,echo=F>>=
-countsTable<-summarized[,c(samp1,samp2)]
+
+\subsubsection{Dispersion}
+EdgeR allows for a common dispersion level to be set a priori.
+
+In this report we have set the common dispersion to \Sexpr{commonDisp}.
+
+<<setup,echo=F,results=hide>>=
+correctOrder<-c(samp2,samp1)
+correctSize<-c(sizeName2,sizeName1)
+
+#notice samp2,samp1 unlike deseq
+countsTable<-summarized[,correctOrder]
 #no nulls allowed
 countsTable[is.na(countsTable)]<-1
 countsTable[countsTable==0]<-1
 
 row.names(countsTable)<-summarized$mirnaGene
-conds<-as.factor(c(samp1,samp2))
-cds<-newCountDataSet(countsTable,conds)
+#conds<-as.factor(c(samp1,samp2))
+
+d<-DGEList(counts=as.matrix(countsTable),group=correctOrder)
+d$common.dispersion<-commonDisp
+
 
 #using the read counts
 if(useLibs=='library'){
-sizeFactors(cds)<-runs[c(sizeName1,sizeName2),"size"]
+    d$samples$lib.size<-runs[correctSize,"size"]
 }else{
 if(useLibs=='estimate'){
 #using the mirna counts
-cds<-estimateSizeFactors(cds)
+#cds<-estimateSizeFactors(cds)
 }else{
     if(useLibs=='rpm'){
         #sizeFactors(cds)=c(1000000,1000000)
-        sizeFactors(cds)=c(1,1)
+        #sizeFactors(cds)=c(1,1)
     }else{
         stop("there is something wrong with useLibs")
     }
 }
 }
-cds<-estimateVarianceFunctions(cds,method="blind")
 
-#always put rb in samp1
-#always put control in samp2
-#but call the test (s2,s1) so fold changes in rb/control
-res<-nbinomTest(cds,samp2,samp1)
-write.table(res,file=paste(samp1,"_",samp2,"_",useLibs,".txt",sep=""))
+
+de.com<-exactTest(d,pair=correctOrder)
+tt<-topTags(de.com,n=nrow(de.com$table),sort.by="p.value")
+res<-tt@.Data[[1]]
+write.table(res,file=paste(samp1,"_",samp2,"_",useLibs,".edger.txt",sep=""))
 myPval<-.05
 @
 
@@ -272,15 +276,16 @@ Significantly differentially expressed miRNAs. Fold change is retinoblastoma/nor
 
 
 <<dePval,results=tex,echo=F>>=
-resSig<-subset(res[,1:8],pval < myPval)
-names(resSig)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
-myXtableOne<-xtable(resSig[order(resSig$pval),1:8],type=tex,caption=paste("Significant (P<",myPval,") differential expression before the correction for multiple testing"),display=c('d','s','E','E','E','g','g','g','g'))
+resSig<-subset(res,res$PValue < myPval)
+displayColumnSetup<-c('s','f','f','e','e')
+#names(resSig)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
+myXtableOne<-xtable(resSig[order(resSig$PValue)[1:30],],type=tex,caption=paste("Significant (P<",myPval,") differential expression before the correction for multiple testing (top 30)"),digits=3,display=displayColumnSetup)
 
-print(myXtableOne,include.rownames=FALSE, size="\\footnotesize")
+print(myXtableOne,include.rownames=TRUE, size="\\footnotesize")
 @
 
 After correcting for multiple testing (Benjamini-Hochberg procedure),
-\Sexpr{nrow(subset(res,padj<.05))} miRNAs were differentially
+\Sexpr{nrow(subset(res,FDR<.05))} miRNAs were differentially
 expressed.
 \pagebreak
 \subsubsection{Upregulated miRNAs}
@@ -288,34 +293,31 @@ Identifying upregulated miRNAs by fold change is problematic, as the
 metric does not scale well for analyses with large variations in
 expression and will be dominated by low and zero count miRNAs.
 
-One approach is to take the subset of miRNAs with baseMeans greater
+One approach is to take the subset of miRNAs with logConc greater
 than the median.
 
 <<upreg,results=tex,echo=F>>=
-regs<-subset(res[,1:8],baseMean>median(res$baseMean))
-names(regs)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
+regs<-subset(res,logConc>median(res$logConc))
+#names(regs)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
 
-upRegs<-regs[ order(-regs$fc)[1:20], ]
-myXtableTwo<-xtable(upRegs,type=tex,caption=paste("Strongly upregulated miRNAs in ",gsub('_','-',samp1),sep=""),display=c('d','s','E','E','E','g','g','g','g'))
-print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
+upRegs<-regs[ order(-regs$logFC)[1:20], ]
+myXtableTwo<-xtable(upRegs,type=tex,caption=paste("Strongly upregulated miRNAs in ",gsub('_','-',samp1),sep=""),digits=3,display=displayColumnSetup)
+print(myXtableTwo,include.rownames=TRUE, size="\\footnotesize")
 @
 
 \pagebreak
 \subsubsection{Downregulated miRNAs}
 <<downreg,results=tex,echo=F>>=
-downRegs<-regs[ order(regs$fc)[1:20], ]
-myXtableThree<-xtable(downRegs,type=tex,caption=paste("Strongly downregulated miRNAs in ",gsub('_','-',samp1),sep=""),display=c('d','s','E','E','E','g','g','g','g'))
-print(myXtableThree,include.rownames=FALSE, size="\\footnotesize")
+downRegs<-regs[ order(regs$logFC)[1:20], ]
+myXtableThree<-xtable(downRegs,type=tex,caption=paste("Strongly downregulated miRNAs in ",gsub('_','-',samp1),sep=""),digits=3,display=displayColumnSetup)
+print(myXtableThree,include.rownames=TRUE, size="\\footnotesize")
 @
 
 \pagebreak
-\subsection{Fold Change and Significance}
-The method DESeq uses to estimate variance in samples with no
-replicates may bias it to assigning very high fold change significance
-thresholds differentially expressed genes.
+\subsection{Fold Change and Concentration}
 
 <<fcVsBasemean,echo=FALSE,fig=TRUE>>=
-q<-qplot(log2(res$baseMean),res$log2FoldChange)+aes(color=res$pval<.05)
+q<-qplot(res$logConc,res$logFC)+aes(color=res$PValue<.05)+xlab("logConc")+ylab("logFC")
 print(q)
 @
 \pagebreak
@@ -326,8 +328,9 @@ print(q)
 
 
 
-\bibitem{Anders} Anders, S. and  Huber, W. Differential expression analysis for sequence count data. Nature Precedings
-http://dx.doi.org/10.1038/npre.2010.4282.2.
+
+\bibitem{Robinson} Robinson, M. D., McCarthy, D. J.\& Smyth, G. K. edgeR: a bioconductor package for differential expression analysis of digital gene expression data. Bioinformatics 26, 139-140 (2010).
+http://dx.doi.org/10.1093/bioinformatics/btp616.
 
 \end{thebibliography}		% end the bibliography
 
