@@ -1,0 +1,49 @@
+#"Counts.FGC0031.8_GTCT"
+#"RPM.FGC0031.8_GTCT"
+
+#"Counts.FGC0036.1_NOBC"
+#"RPM.FGC0036.1_NOBC"
+
+#"Counts.FGC0036.2_GTCT"
+#"RPM.FGC0036.2_GTCT"
+
+#"Counts.FGC0036.2_NOBC"
+#"RPM.FGC0036.2_NOBC"
+
+
+<<setup,echo=F>>=
+#program<-'DESeq'
+program<-"EdgeR"
+commonDisp<-.2
+calcNorm<-TRUE
+useLibs<-'estimate'
+samp1<-"Counts.FGC0031.8_GTCT"
+samp2<-"Counts.FGC0042.1_NOBC"
+sizeName1<-"FGC0031S8"
+sizeName2<-"FGC0042S1"
+@
+<<doIt,echo=F>>=
+ texName<-paste("reports/",gsub('\\.','-',samp1),"-",gsub('\\.','-',samp2),"-",useLibs,"-",program,".tex",sep="")
+ script<-paste("miRNA_",program,".Rnw",sep="")
+ Sweave(script,output=texName)
+ system(paste("/usr/texbin/pdflatex -interaction=nonstopmode -output-directory reports ",texName))
+@
+<<runMe,echo=F>>=
+samp1<-"Counts.FGC0036.1_NOBC"
+<<doIt>>
+samp1<-"Counts.FGC0036.2_GTCT"
+
+<<doIt>>
+samp1<-"Counts.FGC0036.2_NOBC"
+<<doIt>>
+#useLibs<-'rpm'
+#samp1<-"RPM.FGC0031.8_GTCT"
+#samp2<-"RPM.FGC0042.1_NOBC"
+#<<doIt>>
+#samp1<-"RPM.FGC0036.1_NOBC"
+#<<doIt>>
+#samp1<-"RPM.FGC0036.2_GTCT"
+#<<doIt>>
+#samp1<-"RPM.FGC0036.2_NOBC"
+#<<doIt>>
+@

@@ -234,20 +234,9 @@ dominating the sequencing space of a particular sample.
 This feature {\Sexpr{english(calcNorm)}} used in this report.
 
 \subsubsection{Expression descriptive stats}
-
-p<-ggplot(data=countsTable, aes(x=log2(eval(parse(text=samp2))*1000000/d$samples$lib.size[2]), y=log2(eval(parse(text=samp1))*1000000/d$samples$lib.size[1]))) + 
-geom_point() +
-ylab(paste("log2",samp1)) +
-xlab(paste("log2",samp2)) +
-opts(title = "miRNA RPM counts")
-
-
-\subsubsection{Dispersion}
-EdgeR allows for a common dispersion level to be set a priori.
-
-In this report we have set the common dispersion to textbf{\Sexpr{commonDisp}}.
-
-<<setup,echo=F,results=hide>>=
+Each of the points below represent a miRNA. The counts have been normalized as RPM (reads per million miRNAs).
+This is simply a pre-analysis view of the count data.
+<<desc,echo=F,fig=T>>=
 correctOrder<-c(samp2,samp1)
 correctSize<-c(sizeName2,sizeName1)
 
@@ -259,6 +248,21 @@ countsTable[countsTable==0]<-1
 
 row.names(countsTable)<-summarized$mirnaGene
 #conds<-as.factor(c(samp1,samp2))
+p<-ggplot(data=countsTable, aes(x=log2(eval(parse(text=samp2))*1000000/d$samples$lib.size[2]), y=log2(eval(parse(text=samp1))*1000000/d$samples$lib.size[1]))) + 
+geom_point() +
+ylab(paste("log2",samp1)) +
+xlab(paste("log2",samp2)) +
+opts(title = "miRNA RPM counts")
+print(p)
+@
+
+\subsubsection{Dispersion}
+EdgeR allows for a common dispersion level to be set a priori.
+
+In this report we have set the common dispersion to \textbf{\Sexpr{commonDisp}}.
+
+<<setup,echo=F,results=hide>>=
+
 
 d<-DGEList(counts=as.matrix(countsTable),group=correctOrder)
 
