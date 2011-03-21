@@ -23,7 +23,7 @@ sizeName1<-"FGC0031S8"
 sizeName2<-"FGC0042S1"
 @
 <<doIt,echo=F>>=
- texName<-paste("reports/",gsub('\\.','-',samp1),"-",gsub('\\.','-',samp2),"-",useLibs,"-",program,".tex",sep="")
+ texName<-paste("../reports/",gsub('\\.','-',samp1),"-",gsub('\\.','-',samp2),"-",useLibs,"-",program,".tex",sep="")
  script<-paste("miRNA_",program,".Rnw",sep="")
  Sweave(script,output=texName)
  system(paste("/usr/texbin/pdflatex -interaction=nonstopmode -output-directory reports ",texName))

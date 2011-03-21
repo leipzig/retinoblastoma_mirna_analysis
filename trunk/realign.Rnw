@@ -36,7 +36,7 @@
 \maketitle
 \tableofcontents
 \pagebreak
-<<setup,echo=FALSE>>=
+<<setup,echo=FALSE,results=HIDE>>=
 source("config.R")
 library(DESeq)
 library(ggplot2)
@@ -106,6 +106,7 @@ seqs[which(seqs$expLane=='FGC0042-1'),"sample"]<-"normal"
 seqs[which(seqs$barcode=='GTCT'),"sample"]<-"WERI"
 seqs[which((seqs$expLane=='FGC0036-1' | seqs$expLane=='FGC0036-2') & seqs$barcode=='NOBC'),"sample"]<-'Y-79'
 
+
 #get number of sequences
 seqs$numSeqs<-laply(.data=paste(gangulyRoot,seqs$filePath,sep="/"),function(x){length(read.DNAStringSet(x))})
 write.table(seqs,file="schugSeqsTable.txt")
@@ -120,17 +121,87 @@ A breakdown of these by lane and sample
 seqTabulation<-format(ddply(seqs,c("sample","expLane"),summarize,distinctSeqs=sum(numSeqs)),big.mark=",")
 myXtableTwo<-xtable(seqTabulation,type=tex,caption=paste("Distinct sequences by sample/lane"))
 print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
+
 @
 
-\subsection{Against mature miRNAs}
-<<makeFasta,echo=F>>=
+<<sampleSetup,echo=F>>=
+samp1<-'normal'
+file1<-'normals'
+vmfile1<-'normals'
+expLane1<-'FGC0042-1'
+samp2<-'WERI'
+file2<-'WERI_36'
+vmfile2<-'weri36'
+expLane2<-'FGC0036-2'
+minLength<-21
+maxLength<-26
 attach(seqs)
-
-write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal' &  expLane=='FGC0042-1')],sep="/")),file="normals.fa",format="fasta")
-write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='WERI'   &  expLane=='FGC0036-2')],sep="/")),file="WERI_36.fa",format="fasta")
+sampsize1<-sum(seqs[which(seqLength >= minLength & seqLength <= maxLength & sample==samp1 &  expLane==expLane1),"numSeqs"])
+sampsize2<-sum(seqs[which(seqLength >= minLength & seqLength <= maxLength & sample==samp2 &  expLane==expLane2),"numSeqs"])
+hairpins<-readFASTA("../mirna/hairpin.fa",strip.descs=TRUE)
 @
 
+\subsection{Against hairpin miRNAs}
+For the purposes of editing, we can examine how many of the sequences between \Sexpr{minLength}-\Sexpr{maxLength}nt align with zero, one, or two edits.
 
+These are aligned to the subset of human miRNAs in hairpin.fa (\Sexpr{format(length(hairpins),big.mark=",",scientific=F)})
+An edit is defined as an insertion, deletion or substitution event.
+
+In this report we will compare
+
+\textbf{\Sexpr{samp1} \Sexpr{expLane1}}:\Sexpr{format(sampsize1,big.mark=",",scientific=F)} \Sexpr{minLength}-\Sexpr{maxLength}nt seqs
+
+and
+
+\textbf{\Sexpr{samp2} \Sexpr{expLane2}}:\Sexpr{format(sampsize2,big.mark=",",scientific=F)} \Sexpr{minLength}-\Sexpr{maxLength}nt seqs
+
+Alignment is against the forward strand only, reverse complements are not considered.
+<<makeFasta,echo=F>>=
+
+#write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(seqLength >= 21 & seqLength <=26 & sample=='normal' &  expLane=='FGC0042-1')],sep="/")),file="normals.fa",format="fasta")
+#write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(seqLength >= 21 & seqLength <=26 & sample=='WERI'   &  expLane=='FGC0036-2')],sep="/")),file="WERI_36.fa",format="fasta")
+@
+\subsection{Counting principles}
+Counting is query sequence centric, rather than miRNA centric.
+Sequences that align exactly to any miRNA and not considered for editing.
+Sequences that align to multiple miRNAs are tallied only once, this rule extends to sequences that align with one edit to any miRNA and to different miRNA with two edits.
+
+
+<<readVmatch,echo=F>>=
+vmnames<-c("qLen","tName","tPos","strand","qLen","qName","qPos","dist","e-value","score","identity")
+#res1.0<-read.table(paste(vmfile1,"exact.vmatch",sep="."),col.names=vmnames)
+#res2.0<-read.table(paste(vmfile2,"exact.vmatch",sep="."),col.names=vmnames)
+
+#one mismatch -we don't want exact
+#res1.1<-read.table(paste(vmfile1,"e1.all.vmatch",sep="."),col.names=vmnames)
+#res1.1<-res1.1[-which(res1.1$qName %in% res1.0$qName),]
+#res2.1<-read.table(paste(vmfile2,"e1.all.vmatch",sep="."),col.names=vmnames)
+#res2.1<-res2.1[-which(res2.1$qName %in% res2.0$qName),]
+
+res1.2<-read.table(paste(vmfile1,"e2.all.vmatch",sep="."),col.names=vmnames)
+res1.2<-res1.2[-which(res1.2$qName %in% res1.2[which(res1.2$dist==1),"qName"] & res1.2$dist==2),]
+exact1<-res1.2[which(res1.2$dist==0),]
+edited1<-res2.2[!(res1.2$qName %in% res1.2[which(res1.2$dist==1),"qName"]),]
+#res1.2<-res1.2[-which(res1.2$qName %in% res1.0$qName),]
+#res1.2<-res1.2[-which(res1.2$qName %in% res1.1$qName),]
+
+res2.2<-read.table(paste(vmfile2,"e2.all.vmatch",sep="."),col.names=vmnames)
+#exclude redundant
+res2.2<-res2.2[-which(res2.2$qName %in% res2.2[which(res2.2$dist==1),"qName"] & res2.2$dist==2),]
+exact2<-res2.2[which(res2.2$dist==0),]
+edited2<-res2.2[!(res2.2$qName %in% res2.2[which(res2.2$dist==1),"qName"]),]
+
+#res2.2<-res2.2[-which(res2.2$qName %in% res2.0$qName),]
+#res2.2<-res2.2[-which(res2.2$qName %in% res2.1$qName),]
+
+
+qplot(
+f <- function(s) strsplit(as.character(s), "_")[[1]][1]
+sapply(res2.2$tName, f)
+
+
+#    V1                        V2 V3 V4 V5                        V6 V7 V8       V9 V10    V11
+#1   25 hsa-mir-181a-1_MI0000289_ 23  D 25 AAAATTCAACGCTGTCGGTGAGTTT  0  1 9.48e-09  47  96.00
 \begin{thebibliography}{100}	% start the bibliography
 
 \small				% put the bibliography in a small font
