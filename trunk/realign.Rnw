@@ -122,6 +122,9 @@ seqTabulation<-format(ddply(seqs,c("sample","expLane"),summarize,distinctSeqs=su
 myXtableTwo<-xtable(seqTabulation,type=tex,caption=paste("Distinct sequences by sample/lane"))
 print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
 
+normalSeqTab<-"../RB_miRNA_raw_data/589-Ganguly-Chao-Solexa_smRNA/MaskAndSplit/Splits/FGC0042-1_NOBC_report.tab"
+../RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/MaskAndSplit/Combo/Splits/
+FGC0031-8_GTCT_report.tab
 @
 
 <<sampleSetup,echo=F>>=
@@ -181,7 +184,7 @@ vmnames<-c("qLen","tName","tPos","strand","qLen","qName","qPos","dist","e-value"
 res1.2<-read.table(paste(vmfile1,"e2.all.vmatch",sep="."),col.names=vmnames)
 res1.2<-res1.2[-which(res1.2$qName %in% res1.2[which(res1.2$dist==1),"qName"] & res1.2$dist==2),]
 exact1<-res1.2[which(res1.2$dist==0),]
-edited1<-res2.2[!(res1.2$qName %in% res1.2[which(res1.2$dist==1),"qName"]),]
+edited1<-res1.2[!(res1.2$qName %in% res1.2[which(res1.2$dist==1),"qName"]),]
 #res1.2<-res1.2[-which(res1.2$qName %in% res1.0$qName),]
 #res1.2<-res1.2[-which(res1.2$qName %in% res1.1$qName),]
 
@@ -195,13 +198,14 @@ edited2<-res2.2[!(res2.2$qName %in% res2.2[which(res2.2$dist==1),"qName"]),]
 #res2.2<-res2.2[-which(res2.2$qName %in% res2.1$qName),]
 
 
-qplot(
-f <- function(s) strsplit(as.character(s), "_")[[1]][1]
-sapply(res2.2$tName, f)
+#qplot(
+#f <- function(s) strsplit(as.character(s), "_")[[1]][1]
+#sapply(res2.2$tName, f)
 
 
 #    V1                        V2 V3 V4 V5                        V6 V7 V8       V9 V10    V11
 #1   25 hsa-mir-181a-1_MI0000289_ 23  D 25 AAAATTCAACGCTGTCGGTGAGTTT  0  1 9.48e-09  47  96.00
+@
 \begin{thebibliography}{100}	% start the bibliography
 
 \small				% put the bibliography in a small font
