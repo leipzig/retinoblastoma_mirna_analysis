@@ -44,6 +44,8 @@ library(edgeR)
 library(ggplot2)
 library(xtable)
 library(Biostrings)
+library(trackObjs)
+#track.start("tmp1")
 english<-function(x){if(x==TRUE){"is"}else{"is not"}}
 
 if(!exists("samp1") | !exists("useLibs")){stop('Missing startup info')}
@@ -169,7 +171,8 @@ augCounts<-read.csv(paste(gangulyRoot,"read_counts_all_combo.mirAugCounts.csv",s
 augCounts<-augCounts[-1,]
 normalCounts<-read.csv(paste(gangulyRoot,"all_variations_FGC0042-1_NOBC.mirAugCounts.csv",sep="/"),stringsAsFactors=FALSE)
 
-normalCounts<-normalCounts[,c("miRNA","Counts.20.25.Upto2.unique","RPM.20.25.Upto2.unique")]
+
+normalCounts<-normalCounts[,c("miRNA",countsColumn,rpmColumn)]
 names(normalCounts)[2:3]<-c('Counts.FGC0042.1_NOBC','RPM.FGC0042.1_NOBC')
 #mergedTable<-merge(normalCounts,augCounts,by.x="miRNA",by.y="miRNA")
 
@@ -373,6 +376,8 @@ pstate<-function(x){if(x$FDR[1]<.05){'FDR<.05'}else{if(x$PValue[1]<.05){'P<.05'}
 res$pstate<-adply(.data=res,1,.fun=pstate)$V1
 q<-qplot(res$logConc,res$logFC)+aes(color=res$pstate)+xlab("logConc")+ylab("logFC")
 print(q)
+
+#track.stop()
 @
 \pagebreak
 \begin{thebibliography}{100}	% start the bibliography
