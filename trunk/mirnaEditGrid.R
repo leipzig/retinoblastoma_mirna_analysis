@@ -9,13 +9,13 @@ mirnaSEQ <- mget(mappedkeys(x), x)
 x <- mirbaseMATURE
 mirnaMature<-mget(mappedkeys(x),x)
 
-
-setwd("~/Documents/gangulyRBhi")
+workDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/"
+setwd("/nas/is1/leipzig/Ganguly/gangulyRBhi/")
+variationDir<-"results/variation/"
 
 #1) forward ref alleles; 2) reverse ref; 3) forward non-ref; 4) reverse non-ref alleles
-normal<-read.table("normal.hairpin.col",header=FALSE,col.names=c("miRNA","pos","ref","var","refnorm","revrefnorm","varnorm","revvarnorm"))
-tumor<-read.table("tumor.hairpin.col",header=FALSE,col.names=c("miRNA","pos","ref","var","reftumor","revreftumor","vartumor","revvartumor"))
-
+normal<-read.table(paste(workDir,variationDir,"normal.hairpin.col",sep=""),header=FALSE,col.names=c("miRNA","pos","ref","var","refnorm","revrefnorm","varnorm","revvarnorm"))
+tumor<-read.table(paste(workDir,variationDir,"tumor.hairpin.col",sep=""),header=FALSE,col.names=c("miRNA","pos","ref","var","reftumor","revreftumor","vartumor","revvartumor"))
 
 #questionable
 normal$var<-gsub(",.","",normal$var)
