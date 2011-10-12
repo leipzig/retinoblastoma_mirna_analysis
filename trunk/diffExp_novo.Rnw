@@ -38,20 +38,22 @@
 \maketitle
 \tableofcontents
 \pagebreak
-<<setup,echo=FALSE>>=
+<<setup,echo=FALSE,results=HIDE>>=
 library(Rsamtools)
 library(Biostrings)
 library(stringr)
 library(plyr)
 library(reshape)
-library("edgeR")
+#library("edgeR")
 library("DESeq")
 library(ggplot2)
 library(xtable)
 
+workDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/"
+
 rpmNormalize<-FALSE
 minCount<-100
-s <- read.DNAStringSet("refs/hsa_hairpin.dna.fa",use.names=TRUE)
+s <- read.DNAStringSet(paste(workDir,"data/","refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
 hsa<-s[str_detect(names(s),"^hsa")]
 
 names(hsa)<-str_match(names(hsa),"^\\S+")
@@ -59,32 +61,34 @@ hsaGR<-GRanges(names(hsa),IRanges(1,width(hsa)),strand="*")
 
 
 mirna<-function(x){
-  xdf<-countBam(file=paste("./",x,suffix,sep=""),param=ScanBamParam(which=hsaGR))[,c("space","records")]
+  xdf<-countBam(file=paste(workDir,bamDirectory,x,suffix,sep=""),param=ScanBamParam(which=hsaGR))[,c("space","records")]
   names(xdf)<-c("miRNA","reads")
   if(rpmNormalize){xdf$reads<-xdf$reads*1000000/sum(xdf$reads)}
   xdf$variable<-x
   xdf
 }
 
-bamDirectory<-"bwaAlignments/"
+bamDirectory<-"data/bam/"
 #"./"
 conds<-c("N","T","N","T","N","T")
 samples<-c("RB494N","RB494T","RB495N","RB495T","RB498N","RB498T")
-suffix<-".fq.cutadapt.min17.hairpin.sorted.bam"
-#".hairpin.bam"
+suffix<-".hairpin.sam.sorted.bam"
 
 
 uncasted<-ldply(as.list(samples),.fun=mirna)
-rnaSeqReadyDataFrame<-cast(uncasted,miRNA ~ variable,value="reads")
-write.csv(rnaSeqReadyDataFrame,file="rawCounts.csv")
-rnaSeqReadyDataFrame<-subset(rnaSeqReadyDataFrame,rowSums(rnaSeqReadyDataFrame)>minCount)
+counts<-cast(uncasted,miRNA ~ variable,value="reads")
+write.csv(counts,file="rawCounts.csv")
 
-countsTable<-as.matrix(rnaSeqReadyDataFrame[,-1])
-row.names(countsTable)<-rnaSeqReadyDataFrame$miRNA
+countsMatrix<-as.matrix(counts)
+countsAboveThreshold<-subset(countsMatrix,rowSums(countsMatrix)>minCount)
+
+#countsAboveThreshold<-subset(counts,rowSums(counts)>minCount)
+#countsAboveThreshold<-as.matrix(countsAboveThreshold[,-1])
+#row.names(countsAboveThreshold)<-countsAboveThreshold$miRNA
 
 
 
-#d<-DGEList(counts=countsTable,group=conds)
+#d<-DGEList(counts=countsAboveThreshold,group=conds)
 #d<-calcNormFactors(d)
 #d<-estimateCommonDisp(d)
 #de.com <- exactTest(d)
@@ -94,7 +98,7 @@ row.names(countsTable)<-rnaSeqReadyDataFrame$miRNA
 
 
 
-cds <- newCountDataSet( countsTable, conds )
+cds <- newCountDataSet( countsAboveThreshold, conds )
 cds <- estimateSizeFactors( cds )
 cds <- estimateVarianceFunctions( cds )
 res <- nbinomTest( cds, "N", "T")
@@ -119,7 +123,7 @@ R-based RNA-Seq analysis package DESeq \cite{Anders} in order to
 detect differential expression between normal and retinoblastoma cells.
 
 Only miRNAs with a combined count of \Sexpr{minCount} among all samples were considered.
-\Sexpr{nrow(rnaSeqReadyDataFrame)} miRNAs fit this criteria.
+\Sexpr{nrow(countsAboveThreshold)} miRNAs fit this criteria.
 
 \pagebreak
 \subsection{Results}
@@ -173,8 +177,11 @@ Genes with high fold change may not be significantly differentially expressed si
 q<-qplot(log2(res$baseMean),res$log2FoldChange)+aes(color=res$pval<.05)
 print(q)
 @
-
-
+\pagebreak
+\subsection{Heatmap and dendrogram}
+<<heatmap,fig=TRUE,echo=F>>=
+heatmap(countsAboveThreshold,Rowv=NA,keep.dendro=FALSE,labRow=NULL)
+@
 \begin{thebibliography}{100}  % start the bibliography
 
 \small				% put the bibliography in a small font

@@ -31,22 +31,33 @@ getPval<-function(x){
   fisher.test(mirnaMat,alternative="two.sided")$p.val
 }
 
-res<-ddply(.data=all,.(miRNA,pos,ref,var,refnorm,varnorm,reftumor,vartumor),transform,fisherTwoSidedpval=fisher.test(matrix(c(refnorm,varnorm,reftumor,vartumor),nrow=2,dimnames=list(c("ref","var"),c("norm","tumor"))))$p.val)
-res$seq<-as.character(mirnaSEQ[as.character(res$miRNA)])
+
+
+
 
 matOnHair<-function(miRNA,var,pos,seq){
+  spacechar<-' '
+  newline<-"<br>"
   myrange<-IRanges(start=matureFrom(mirnaMature[miRNA][[1]]),end=matureTo(mirnaMature[miRNA][[1]]),names=matureName(mirnaMature[miRNA][[1]]))
-  dashes<-rep(" ",max(str_length(as.character(seq)),0))
+  dashes<-rep(spacechar,max(str_length(as.character(seq)),0))
   dashes[as.integer(myrange[str_sub(names(myrange),-1)=='*'])]<-'*'
   dashes[as.integer(myrange[str_sub(names(myrange),-1)!='*'])]<-'='
   dashstr<-paste(dashes,sep="",collapse="")
   #mutspace<-rep(" ",pos)
   #mutstr<-paste(mutspace,var,sep="",collapse="")
-  mutstr<-str_pad(var,pos+str_length(var)-1)
-  paste(dashstr,seq,mutstr,sep="\n")
+  mutstr<-str_pad(var,pos+str_length(var)-1,pad=spacechar)
+  paste("<pre>",dashstr,seq,mutstr,"</pre>",sep=newline)
 }
-res<-ddply(.data=res,c("miRNA","pos","ref","var"),transform,hairpin=matOnHair(as.character(miRNA),var,pos,seq))
-res<-res[,-which(names(res)=='seq')]
-write.csv(res,file="hairpin.edits.fisher.csv")
+res<-ddply(.data=all,.(miRNA,pos,ref,var,refnorm,varnorm,reftumor,vartumor),transform,fisherTwoSidedpval=fisher.test(matrix(c(refnorm,varnorm,reftumor,vartumor),nrow=2,dimnames=list(c("ref","var"),c("norm","tumor"))))$p.val)
+res$seq<-as.character(mirnaSEQ[as.character(res$miRNA)])
+
+rest<-ddply(.data=res,c("miRNA","pos","ref","var"),transform,hairpin=matOnHair(as.character(miRNA),var,pos,seq))
+
+rest<-rest[,-which(names(rest)=='seq')]
+sortable.html.table(rest,"res.html","/home/leipzig/public_html","miRNA edits")
+
+
+
+write.csv(rest,file="hairpin.edits.fisher.csv")
 
 
