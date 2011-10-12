@@ -34,7 +34,7 @@
 
 \begin{document}
 \newcommand{\COT}{C$_{0}$t }
-\title{An analysis of miRNA differential expression from HiSeq data}
+\title{An analysis of miRNA differential expression from HiSeq data (bwa alignment)}
 \author{Jeremy Leipzig}
 \maketitle
 \tableofcontents
