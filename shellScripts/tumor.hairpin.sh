@@ -1,0 +1,1 @@
+samtools mpileup -uDf /storage/Ganguly/gangulyRBhi/refs/hsa_hairpin.dna.fa /storage/Ganguly/gangulyRBhi/RB494T.hairpin.bam /storage/Ganguly/gangulyRBhi/RB495T.hairpin.bam /storage/Ganguly/gangulyRBhi/RB498T.hairpin.bam | bcftools view -bvc - > /storage/Ganguly/gangulyRBhi/tumor.hairpin.bcf

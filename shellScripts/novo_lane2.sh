@@ -1,0 +1,1 @@
+/share/apps/bin/novoalign -d /storage/Ganguly/gangulyRBhi/hg19.ndx -f /storage/Ganguly/gangulyRBhi/flowcell17/lane_2/HWI-ST431_52_2_1.export.txt.fq -a -m -l 17 -h 60 -t 65 -o sam

@@ -1,0 +1,1 @@
+samtools mpileup -uDf /storage/Ganguly/gangulyRBhi/refs/hg19.fa /storage/Ganguly/gangulyRBhi/RB494T.hg19.all.bam /storage/Ganguly/gangulyRBhi/RB495T.hg19.all.bam /storage/Ganguly/gangulyRBhi/RB498T.hg19.all.bam | bcftools view -bvc - > /storage/Ganguly/gangulyRBhi/tumor.hg19.all.bcf
