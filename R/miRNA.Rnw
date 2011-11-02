@@ -8,7 +8,7 @@
 \lhead{\fancyplain{}{\thepage}}
 \chead{}
 \rhead{\fancyplain{}{\bfseries miRNA Reanalyis}}
-\rfoot{$Rev$}
+\rfoot{$Rev: 2939 $}
 \cfoot{}
 \lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
 
@@ -166,6 +166,7 @@ Our primary assumption is still that the mean is a good predictor for the varian
 \end{quote}
 
 <<deseqBaTwoWay,echo=F>>=
+gangulyRoot<-"/nas/is1/leipzig/Ganguly/gangulySolexa"
 baTwoWay<-read.csv(paste(gangulyRoot,"RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/Report/ba-TwoLaneWy.csv",sep="/"))
 samp1<-"31S8_WERI"
 samp2<-"36S1_Y79"
@@ -252,8 +253,12 @@ print(myXtableTwo,include.rownames=FALSE, size="\\footnotesize")
 <<makeFasta,echo=F>>=
 attach(seqs)
 
-write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal' &  expLane=='FGC0042-1')],sep="/")),file="normals.fa",format="fasta")
+#write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal' &  expLane=='FGC0042-1')],sep="/")),file="normals.fa",format="fasta")
 write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='WERI'   &  expLane=='FGC0036-2')],sep="/")),file="WERI_36.fa",format="fasta")
+write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='WERI')],sep="/")),file="WERI.fa",format="fasta")
+write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='normal')],sep="/")),file="normal.fa",format="fasta")
+write.XStringSet(read.DNAStringSet(paste(gangulyRoot,filePath[which(sample=='Y-79')],sep="/")),file="Y-79.fa",format="fasta")
+
 @
 
 

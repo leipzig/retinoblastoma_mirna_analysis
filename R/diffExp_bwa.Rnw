@@ -52,7 +52,12 @@ library(xtable)
 
 rpmNormalize<-FALSE
 minCount<-100
-s <- read.DNAStringSet("refs/hsa_hairpin.dna.fa",use.names=TRUE)
+
+dataDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/data/"
+bamDirectory<-"bwaAlignments/"
+outputDir="/nas/is1/leipzig/Ganguly/gangulyRBhi/results/diffExpBWA/"
+
+s <- read.DNAStringSet(paste(dataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
 hsa<-s[str_detect(names(s),"^hsa")]
 
 names(hsa)<-str_match(names(hsa),"^\\S+")
@@ -60,14 +65,14 @@ hsaGR<-GRanges(names(hsa),IRanges(1,width(hsa)),strand="*")
 
 
 mirna<-function(x){
-  xdf<-countBam(file=paste(bamDirectory,x,suffix,sep=""),param=ScanBamParam(which=hsaGR))[,c("space","records")]
+  xdf<-countBam(file=paste(dataDir,bamDirectory,x,suffix,sep=""),param=ScanBamParam(which=hsaGR))[,c("space","records")]
   names(xdf)<-c("miRNA","reads")
   if(rpmNormalize){xdf$reads<-xdf$reads*1000000/sum(xdf$reads)}
   xdf$variable<-x
   xdf
 }
 
-bamDirectory<-"bwaAlignments/"
+
 mismatches<-1
 #"./"
 conds<-c("N","T","N","T","N","T")
@@ -100,7 +105,7 @@ cds <- newCountDataSet( countsTable, conds )
 cds <- estimateSizeFactors( cds )
 cds <- estimateVarianceFunctions( cds )
 res <- nbinomTest( cds, "N", "T")
-write.csv(res,file="deseqResults.csv")
+write.csv(res,file=paste(outputDir,"deseqResults.csv",sep=""))
 
 @
 \section{Introduction}
