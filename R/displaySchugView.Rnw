@@ -1,0 +1,30 @@
+\documentclass{article}
+\usepackage{longtable}
+\usepackage[margin=.5in]{geometry}
+\usepackage{array}
+\begin{document}
+
+
+<<load,echo=F,results=hide>>=
+library(stringr)
+library(xtable)
+load("recasted.RData")
+lets<-subset(recasted[order(recasted$rname,recasted$edits),],str_detect(recasted$rname,"^hsa-let-7a-1"))[1:1000,-1]
+lets$spacedSeq<-str_replace_all(lets$spacedSeq,' ','\\~')
+names(lets)<-str_replace_all(names(lets),'RB','')
+names(lets)[1]<-"TGGGATGAGGTAGTAGGTTGTATAGTTTTAGGGTCACACCCACCACTGGGAGATAACTAT"
+
+myXtable<-xtable(lets,caption="hsa-let-7a-1")
+@
+\begin{footnotesize}
+\begin{ttfamily}
+<<display,echo=F,results=tex>>=
+
+print(myXtable, include.rownames=FALSE, only.contents=FALSE, tabular.environment='longtable',floating=FALSE,caption.placement="top",sanitize.text.function = function(x) {
+ x
+})
+
+@
+\end{ttfamily}
+\end{footnotesize}
+\end{document}
