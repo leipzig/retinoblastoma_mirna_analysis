@@ -1,20 +1,37 @@
 \documentclass{article}
 \usepackage{longtable}
-\usepackage[margin=.5in]{geometry}
+\usepackage[margin=.15in]{geometry}
 \usepackage{array}
 \begin{document}
 
 
 <<load,echo=F,results=hide>>=
+library(Biostrings)
 library(stringr)
 library(xtable)
-load("recasted.RData")
-lets<-subset(recasted[order(recasted$rname,recasted$edits),],str_detect(recasted$rname,"^hsa-let-7a-1"))[1:1000,-1]
-lets$spacedSeq<-str_replace_all(lets$spacedSeq,' ','\\~')
-names(lets)<-str_replace_all(names(lets),'RB','')
-names(lets)[1]<-"TGGGATGAGGTAGTAGGTTGTATAGTTTTAGGGTCACACCCACCACTGGGAGATAACTAT"
+library(gtools)
+args<-commandArgs(TRUE)
+mirna<-get(load(args[1]))
+#lets<-subset(mirna[order(mirna$rname,mirna$edits),],str_detect(mirna$rname,"^hsa-let-7a-1"))[1:1000,-1]
 
-myXtable<-xtable(lets,caption="hsa-let-7a-1")
+names(mirna)<-str_replace_all(names(mirna),'RB','')
+#names(lets)[1]<-"TGGGATGAGGTAGTAGGTTGTATAGTTTTAGGGTCACACCCACCACTGGGAGATAACTAT"
+
+dataDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/data/"
+s <- read.DNAStringSet(paste(dataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
+hsa<-s[str_detect(names(s),"^hsa")]
+hsaLookup<-function(x){as.character(hsa)[x]}
+
+excelTable<-mirna[mixedorder(mirna$edits),]
+names(excelTable)[3]<-hsaLookup(mirna$rname[1])
+write.csv(excelTable,file=paste(mirna$rname[1],"csv",sep="."))
+
+
+mirna$spacedSeq<-str_replace_all(mirna$spacedSeq,' ','\\~')
+names(mirna)[3]<-hsaLookup(mirna$rname[1])
+myXtable<-xtable(mirna[mixedorder(mirna$edits),-c(1,2)],caption=mirna$rname[1])
+
+
 @
 \begin{footnotesize}
 \begin{ttfamily}

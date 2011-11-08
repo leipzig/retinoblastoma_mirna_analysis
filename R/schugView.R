@@ -32,7 +32,8 @@ s <- read.DNAStringSet(paste(dataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names
 hsa<-s[str_detect(names(s),"^hsa")]
 
 names(hsa)<-str_match(names(hsa),"^\\S+")
-hsaLookup<-as.character(hsa)
+
+hsaLookup<-function(x){as.character(hsa)[x]}
 hsaGR<-GRanges(names(hsa),IRanges(1,width(hsa)),strand="*")
 
 
@@ -49,6 +50,20 @@ param<-ScanBamParam(what=what,which=hsaGR)
 bams <- scanBam(bamView, param=param)
 #bams <- readBamGappedAlignments(bamView)
 
+matOnHair<-function(miRNA){
+  seq<-hsaLookup(miRNA)
+  spacechar<-' '
+  newline<-"<br>"
+  myrange<-IRanges(start=matureFrom(mirnaMature[miRNA][[1]]),end=matureTo(mirnaMature[miRNA][[1]]),names=matureName(mirnaMature[miRNA][[1]]))
+  dashes<-rep(spacechar,max(str_length(as.character(seq)),0))
+  dashes[as.integer(myrange[str_sub(names(myrange),-1)=='*'])]<-'*'
+  dashes[as.integer(myrange[str_sub(names(myrange),-1)!='*'])]<-'='
+  dashstr<-concat(dashes,collapse="")
+  #mutspace<-rep(" ",pos)
+  #mutstr<-paste(mutspace,var,sep="",collapse="")
+  #mutstr<-str_pad(var,pos+str_length(var)-1,pad=spacechar)
+  concat(seq,dashstr,sep=newline)
+}
 
 concat<-function(...,sep="",collapse=NULL){
   strings<-list(...)
@@ -64,7 +79,7 @@ concat<-function(...,sep="",collapse=NULL){
   }
 }
 
-editColumn<-function(targetseq,queryseq){
+editColumn<-function(targetseq,queryseq,N_is_reference=TRUE){
 
   #submir<-str_sub(mirna,posOnMir,posOnMir+str_length(seq)-1)
   #pwa<-pairwiseAlignment(submir,seq,type="local-global")
@@ -103,8 +118,8 @@ schug<-function(x){
        udf<-ddply(cntdf,.(rname,strand,seq,pos,qwidth,nrow)
                   ,transform
                   ,spacedSeq=paste(str_pad(seq,pos+qwidth-1))
-                  ,mirna=hsaLookup[as.character(rname)]
-                ,edits=formatEdits(editColumn(hsaLookup[as.character(as.character(rname))],as.character(seq)))
+                  ,mirna=hsaLookup(as.character(rname))
+                ,edits=formatEdits(editColumn(hsaLookup(as.character(as.character(rname))),as.character(seq)))
                   )
         #udf$sample<-str_split_fixed(udf$.id,'\\.',2)[,1]
       udf[order(udf$edits,-udf$nrow),c("rname","spacedSeq","nrow","edits")]
@@ -117,6 +132,7 @@ uschug$sample<-str_split_fixed(uschug$.id,'\\.',2)[,1]
 
 recasted<-recast(uschug[,-1],rname+spacedSeq+edits~sample,sum)
 
+d_ply(recasted,.(rname),.fun=function(x){save(x,file=paste("schugs/",x$rname[1],".RData",sep=""),compress=TRUE)})
 #get sample name, i.e RB494N
 #
 #allbams<-ldply(ubams,.fun=function(x){ldply(x[1],.fun=schug,.parallel=TRUE)})
