@@ -1,0 +1,301 @@
+% -*- mode: noweb; noweb-default-code-mode: R-mode; -*-
+\documentclass{article}
+
+%headers and footers
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+\pagestyle{fancyplain}
+\lhead{\fancyplain{}{\thepage}}
+\chead{}
+\rhead{\fancyplain{}{\bfseries miRNA HiSeq Analysis}}
+\rfoot{$Rev: 2964 $}
+\cfoot{}
+\lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
+
+
+%hyperlink setup
+\usepackage{hyperref}
+\usepackage{xcolor}
+\definecolor{dark-red}{rgb}{0.4,0.15,0.15}
+\definecolor{dark-blue}{rgb}{0.15,0.15,0.4}
+\definecolor{medium-blue}{rgb}{0,0,0.5}
+\hypersetup{
+    colorlinks, linkcolor={dark-red},
+    citecolor={dark-blue}, urlcolor={medium-blue}
+}
+
+
+\usepackage{longtable}
+\usepackage{rotating}
+
+%underscores in variable names cause problems
+%\usepackage{underscore}
+
+\begin{document}
+\newcommand{\COT}{C$_{0}$t }
+\title{An analysis of miRNA differential expression}
+\author{Jeremy Leipzig}
+\maketitle
+\tableofcontents
+\pagebreak
+<<setup,echo=FALSE,results=HIDE>>=
+library(Rsamtools)
+library(Biostrings)
+library(stringr)
+library(plyr)
+library(reshape)
+#library("edgeR")
+library("DESeq")
+library(ggplot2)
+library(xtable)
+source("concat.R")
+sessInfo<-sessionInfo()
+hiseqDataDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/data/"
+solexaDataDir<-"/nas/is1/leipzig/Ganguly/doSolexa/"
+ionDataDir<-"/nas/is1/leipzig/Ganguly/RB525T_PGM/"
+bamDirectory<-"bam/"
+outputDir="/nas/is1/leipzig/Ganguly/gangulyRBhi/results/"
+hiseqconds<-c("N","T","N","T","N","T","T","T")
+hiseqsamples<-c("RB494N","RB494T","RB495N","RB495T","RB498N","RB498T","RB517T","RB525T")
+solexaconds<-c("T","T","T","T","N")
+solexasamples<-c("FGC0031_s_8.WERI","FGC0036_s_1.Y79","FGC0036_s_2.WERI","FGC0036_s_2.Y79","FGC0042_s_1.normal")
+solexaprettynames<-c("31s8_WERI","36s1_Y79","36s2_WERI","36s2_Y79","42s1_nrml")
+ionconds<-c("T")
+ionsamples<-c("RB525T")
+ionprettynames<-c("RB525T_PGM")
+hiseqbamPaths<-concat(hiseqDataDir,bamDirectory,hiseqsamples,'.hairpin.sam.sorted.bam')
+solexabamPaths<-concat(solexaDataDir,bamDirectory,solexasamples,'.bam')
+ionbamPaths<-concat(ionDataDir,bamDirectory,ionsamples,'.bam')
+bamPaths<-c(hiseqbamPaths,solexabamPaths,ionbamPaths)
+samples<-c(hiseqsamples,solexaprettynames,ionprettynames)
+names(bamPaths)<-samples
+bamconds<-c(hiseqconds,solexaconds,ionconds)
+bamSamples<-DataFrame(conds=bamconds,row.names=samples)
+
+bamView<-BamViews(bamPaths=bamPaths,
+bamSamples=bamSamples)
+
+bamcounts<-countBam(bamView)
+
+
+
+rpmNormalize<-FALSE
+minCount<-200
+
+hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
+names(hairpins)<-str_match(names(hairpins),"^\\S+") 
+hairpinLookup<-function(x){as.character(hairpins)[x]}
+hairpinGR<-GRanges(names(hairpins),IRanges(1,width(hairpins)),strand="*")
+
+mirna<-function(x){
+  xdf<-countBam(file=as.character(x$bamPaths),param=ScanBamParam(which=hairpinGR))[,c("space","records")]
+  names(xdf)<-c("miRNA","reads")
+  if(rpmNormalize){xdf$reads<-xdf$reads*1000000/sum(xdf$reads)}
+  xdf$variable<-row.names(x)
+  xdf
+}
+
+
+uncasted<-ddply(as.data.frame(bamPaths),.(bamPaths),.fun=mirna)
+counts<-cast(uncasted,miRNA ~ variable,value="reads")
+
+#technical replicates
+counts$WERI<-counts[,'31s8_WERI']+counts[,'36s2_WERI']
+counts$Y79<-counts[,'36s1_Y79']+counts[,'36s1_Y79']
+counts<-counts[,!str_detect(colnames(counts),'^3')]
+#this messes up the id.var so matrix doesn't work
+
+#42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T   WERI    Y79
+conds<-c('N','N','T','N','T','N','T','T','T','T','T','T')
+individual<-c(1,2,2,3,3,4,4,5,6,7,8,6)
+replicate<-c(1,1,2,1,2,1,2,2,2,2,2,2)
+type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx','PGM')
+pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual)
+rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79','RB525T_PGM')
+countsMatrix<-as.matrix(counts[,-1])
+rownames(countsMatrix)<-counts$miRNA
+colnames(countsMatrix)<-colnames(counts[,-1])
+
+
+
+countsAboveThreshold<-subset(countsMatrix,rowSums(countsMatrix)>minCount)
+
+
+
+cds <- newCountDataSet( countsAboveThreshold, pdata$condition )
+
+
+cds <- estimateSizeFactors( cds )
+
+#fits: parameteric or local
+#methods: pooled per-condition
+#sharingMode="fit-only" gene-est-only
+sharingMode<-'gene-est-only'
+method<-'per-condition'
+fits<-'local'
+cds <- estimateDispersions( cds , fitType="local", method='per-condition', sharingMode=sharingMode)
+res <- nbinomTest( cds, "N", "T")
+
+#pds <- newCountDataSet( countsAboveThreshold, pdata )
+#pds <- estimateDispersions( cds , fitType="local", method='pooled', sharingMode='fit-only')
+#fit1 <- fitNbinomGLMs( pds, count ~  type + condition )
+#fit0 <- fitNbinomGLMs( pds, count ~  type )
+#pvalsGLM <- nbinomGLMTest( fit1, fit0 )
+#padjGLM <- p.adjust( pvalsGLM, method="BH" )
+#res$pvalsGLM<-pvalsGLM
+#res$padjGLM<-padjGLM
+
+
+write.csv(res,file="deseqResults.csv")
+
+@
+\section{Introduction}
+\subsection{Samples}
+Twelve samples, three cohorts of normal and retinoblastoma tissues were collected for miRNA sequencing using the Illumina IIfx, Illumina HiSeq, and Ion Torrent
+
+\begin{itemize}
+  \item Illumina HiSeq
+  \begin{enumerate}
+     \item RB494N \Sexpr{formatC(bamcounts$RB494N$records, format="d", big.mark=',')} alignments
+     \item RB494T \Sexpr{formatC(bamcounts$RB494N$records, format="d", big.mark=',')} alignments
+     \item RB495N \Sexpr{formatC(bamcounts$RB495N$records, format="d", big.mark=',')} alignments
+     \item RB495T \Sexpr{formatC(bamcounts$RB495T$records, format="d", big.mark=',')} alignments
+     \item RB498N \Sexpr{formatC(bamcounts$RB498N$records, format="d", big.mark=',')} alignments
+     \item RB498T \Sexpr{formatC(bamcounts$RB498T$records, format="d", big.mark=',')} alignments
+     \item RB517T \Sexpr{formatC(bamcounts$RB517T$records, format="d", big.mark=',')} alignments
+     \item RB525T \Sexpr{formatC(bamcounts$RB525T$records, format="d", big.mark=',')} alignments
+  \end{enumerate}
+  \item Illumina IIfx
+    \begin{enumerate}
+       \item WERI 31s8 and 36s2 technical replicates \Sexpr{formatC(bamcounts[['31s8_WERI']]$records + bamcounts[['36s2_WERI']]$records, format="d", big.mark=',')} alignments
+       \item Y79 36s1 and 36s2 technical replicates \Sexpr{formatC(bamcounts[['36s1_Y79']]$records+bamcounts[['36s2_Y79']]$records, format="d", big.mark=',')} alignments
+       \item 42s1\_nrml \Sexpr{formatC(bamcounts[['42s1_nrml']]$records, format="d", big.mark=',')} alignments
+    \end{enumerate}
+    \item Ion Torrent PGM
+    \begin{enumerate}
+    \item RB525T\_PGM \Sexpr{formatC(bamcounts$RB525T_PGM$records, format="d", big.mark=',')} alignments
+    \end{enumerate}
+    \end{itemize}  
+
+\subsection{Samples}
+miRNA counts were generated by a novoalign alignment to hairpin sequences without correcting for potential duplicates.
+The alignment allows multiple hits as long as they have "a posterior probability of .7" - this means that the same read is permitted to align to all eligible members of a miRNA family.
+
+The inclusion of multiple members of each family may affect adjustments for multiple comparison.
+
+The WERI, Y79 and 42s1\_nrml sequences were adapter-trimmed using Cutadapt due to 3' barcoding. Novoalign was used to trim the HiSeq sequences.
+The Ion Torrent sequences were pre-trimmed.
+
+The Novoalign command used for the HiSeq samples is as follows:
+\begin{verbatim}
+novoalign -a ATCTCGTATGCCGTCTTCTGCTTG -d hairpin.ndx -F ILMFQ 
+-f FASTQ_FILE.fq -m -l 17 -h 60 -t 65 -o sam -o FullNW
+\end{verbatim}
+
+\subsection{DESeq}
+A reanalysis of the non-normalized count data was performed using the
+R-based RNA-Seq analysis package DESeq \cite{Anders} in order to
+detect differential expression between normal and retinoblastoma cells.
+
+This report uses DESeq version \Sexpr{sessInfo$otherPkgs$DESeq$Version}.
+
+DESeq offers different statistical models and parameters to choose from depending on the data to be analyzed.
+
+Empirical dispersion can be computed using a \emph{pooled}, \emph{per-condition}, or \emph{blind} (no replicates) method.
+
+The following, sharing modes, which determine how much information is used to inform the dispersion of other genes, are available:
+\begin{description}
+ \item[fit-only] is appropriate for only a few replicates
+ \item[maximum] is more conservative for three or four replicates, 
+ \item[gene-est-only] is more aggressive, and is ideal for many replicates
+\end{description}
+
+For this report, we have used the \Sexpr{method} method and \Sexpr{sharingMode} sharing mode.
+
+Only miRNAs with a combined count of \Sexpr{minCount} among all samples were considered.
+\Sexpr{nrow(countsAboveThreshold)} miRNAs fit this criteria.
+
+\pagebreak
+\subsection{Results}
+\subsubsection{Significantly expressed miRNAs}
+Significantly differentially expressed miRNAs. Fold change is retinoblastoma/normal.
+
+<<dePval,results=tex,echo=F>>=
+myPval<-.05
+resSig<-subset(res[,1:8],pval < myPval)
+names(resSig)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
+myXtableOne<-xtable(resSig[order(resSig$pval),1:8],type=tex,caption=paste("Significant (P<",myPval,") differential expression before the correction for multiple testing"),display=c('d','s','E','E','E','g','g','g','g'))
+
+print(myXtableOne,include.rownames=FALSE, tabular.environment = "longtable", floating = FALSE, size="\\footnotesize")
+@
+
+\pagebreak
+\subsubsection{Upregulated miRNAs}
+<<upreg,results=tex,echo=F>>=
+#upRegs<-resSig[ order(-resSig$fc)[1:20], ]
+upRegs<-head(subset(resSig[order(-resSig$fc),],fc>1),n=20)
+
+if(nrow(upRegs)>0){
+myXtableTwo<-xtable(upRegs,type=tex,caption=paste("Strongly significantly upregulated miRNAs in Retinoblastoma (top 20 if available)",sep=""),display=c('d','s','E','E','E','g','g','g','g'))
+print(myXtableTwo,include.rownames=FALSE, tabular.environment = "longtable", floating = FALSE, size="\\footnotesize")
+}else{
+  print("No significantly upregulated miRNAs")
+}
+@
+
+\pagebreak
+\subsubsection{Downregulated miRNAs}
+<<downreg,results=tex,echo=F>>=
+downRegs<-head(subset(resSig[order(resSig$fc),],fc<=1),n=20)
+
+if(nrow(downRegs)>0){
+myXtableThree<-xtable(downRegs,type=tex,caption=paste("Strongly significantly downregulated miRNAs in Retinoblastoma (top 20 if available)",sep=""),digits=3,display=c('d','s','E','E','E','g','g','g','g'))
+print(myXtableThree,include.rownames=FALSE, tabular.environment = "longtable", floating = FALSE, size="\\footnotesize")
+}else{
+  print("No significantly downregulated miRNAs")
+}
+@
+
+\pagebreak
+\subsubsection{hsa-let miRNAs}
+<<downreg,results=tex,echo=F>>=
+letRegs<-res[substr(res$id,0,7)=='hsa-let',1:8]
+names(letRegs)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
+myXtableFour<-xtable(letRegs,type=tex,caption=paste("hsa-let miRNAs in Retinoblastoma",sep=""),digits=3,display=c('d','s','E','E','E','g','g','g','g'))
+print(myXtableFour,include.rownames=FALSE, tabular.environment = "longtable", floating = FALSE, size="\\footnotesize")
+@
+
+\pagebreak
+\subsection{Fold Change and Significance}
+Genes with high fold change may not be significantly differentially expressed simply due to high variance.
+
+<<fcVsBasemean,echo=FALSE,fig=TRUE>>=
+q<-qplot(log2(res$baseMean),res$log2FoldChange)+aes(color=res$pval<.05)
+print(q)
+@
+\pagebreak
+\subsection{hsa-let heatmap and dendrogram}
+<<letheat,fig=TRUE,echo=F>>=
+heatmap(countsAboveThreshold[substr(rownames(countsAboveThreshold),0,7)=='hsa-let',],Rowv=NA,keep.dendro=FALSE,labRow=NULL)
+@
+
+\pagebreak
+\subsection{Eucludian distances}
+<<euclidheat,fig=TRUE,echo=F>>=
+dists<-dist(t(counts(cds)))
+heatmap( as.matrix( dists ))
+@
+
+\begin{thebibliography}{100}  % start the bibliography
+
+\small				% put the bibliography in a small font
+
+
+\bibitem{Anders} Anders, S. and  Huber, W. Differential expression analysis for sequence count data. Nature Precedings
+http://dx.doi.org/10.1038/npre.2010.4282.2.
+
+\end{thebibliography}  	% end the bibliography
+
+
+\end{document}
+
