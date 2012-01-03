@@ -3,12 +3,12 @@ SOURCEDIR := sources
 FASTQDIR := fastq
 DECODEDDIR := decoded
 BAMDIR := bam
-SCRIPTDIR := scripts
+SCRIPTDIR := src
 TRIMMEDDIR := trimmed
 
 #Parameters
 MIN_LENGTH := 15
-REFS:= /home/leipzig/ganguly/gangulyRBhi/data/refs
+REFS:= refs
 GENOME:= hairpin.ndx
 TEMPLATE:= hairpin.dna.fa
 #assume this is sanger-graded
@@ -54,17 +54,15 @@ fastq: $(FASTQ_FILES)
 uncompressed: $(UNCOMPRESSED_FILES)
 
 solexa:
-	ln -s /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0036_s_1_sequence.txt.gz $(SOURCEDIR)/FGC0036_s_1.txt.gz
-	ln -s /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0031_s_8_sequence.txt.gz $(SOURCEDIR)/FGC0031_s_8.txt.gz
-	ln -s /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0036_s_2_sequence.txt.gz $(SOURCEDIR)/FGC0036_s_2.txt.gz
-	ln -s /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/589-Ganguly-Chao-Solexa_smRNA/basic/Solexa/FGC0042_s_1_sequence.txt.gz $(SOURCEDIR)/FGC0042_s_1.txt.gz
+	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0036_s_1_sequence.txt.gz $(SOURCEDIR)/FGC0036_s_1.txt.gz
+	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0031_s_8_sequence.txt.gz $(SOURCEDIR)/FGC0031_s_8.txt.gz
+	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0036_s_2_sequence.txt.gz $(SOURCEDIR)/FGC0036_s_2.txt.gz
+	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/589-Ganguly-Chao-Solexa_smRNA/basic/Solexa/FGC0042_s_1_sequence.txt.gz $(SOURCEDIR)/FGC0042_s_1.txt.gz
 
 clean:
 	rm -f $(DOWNSTREAM_TARGETS)
 
-.PHONY : clean solexa
-
-#all bai sam bam fastq trimmed decoded
+.PHONY : clean solexa all bai sam bam fastq trimmed decoded
 
 #Explicit rules prevent intermediates from being deleted
 #$(SAM_FILES):$(DECODED_FILES)
@@ -77,9 +75,9 @@ $(SOURCEDIR)/%.txt:$(SOURCEDIR)/%.txt.gz
 
 #convert to fastq
 #convert to sanger phred scores
-$(FASTQDIR)/%.fq:$(SOURCEDIR)/%_sequence.txt
-	python $(SCRIPTDIR)/FGC2fastq.py < $< > $@_tmp
-	python $(SCRIPTDIR)/Solexa2Sanger.py $@_tmp $@
+$(FASTQDIR)/%.fq:$(SOURCEDIR)/%.txt
+	python $(SCRIPTDIR)/python/FGC2fastq.py < $< > $@_tmp
+	python $(SCRIPTDIR)/python/Solexa2Sanger.py $@_tmp $@
 	rm $@_tmp
 
 #trim adapters
@@ -95,7 +93,7 @@ $(DEBARCODED_FILES): $(DECODEDDIR)/%.WERI.fq : $(TRIMMEDDIR)/%.$(MIN_LENGTH).fq
 
 #unmatched seqs are actually Y79
 $(DECODEDDIR)/FGC0036_s_2.Y79.fq : $(DECODEDDIR)/FGC0036_s_2.WERI.fq
-	mv FGC0036_s_2.unmatched.decoded.fq $@
+	mv FGC0036_s_2.unmatched.decoded.tmp $@
 
 #FGC0036_s_1 is Y79 not barcoded
 #FGC0042_s_1 is normal not barcoded
