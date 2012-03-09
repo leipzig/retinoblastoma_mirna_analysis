@@ -1,26 +1,42 @@
 #Directories
-FASTQDIR := fastq
-BAMDIR := bam
-SCRIPTDIR := src
-RCSDIR:= rcs
+TOP := $(shell pwd)
+FASTQDIR := $(TOP)/fastq
+BAMDIR := $(TOP)/bam
+REFTYPES:= hairpin hg19
+SCRIPTDIR := $(TOP)/src
+RCSDIR:= $(TOP)/rcs
+
+#Programs
+SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
+SAMTOOLS:= $(wildcard $(SAM_POSS))
+
+NOVO_POSS:= /share/apps/bin/novoalign /usr/bin/novoalign
+NOVOALIGN:= $(wildcard $(NOVO_POSS))
 
 #Parameters
+ALIGNERS:= novo
+PARAMSETS:= loose tight
 REFS:= refs
-GENOME:= hairpin.ndx
-TEMPLATE:= hairpin.dna.fa
-#assume this is sanger-graded
-NOVOCMD := novoalign -m -l 17 -h 60 -t 65 -o sam -o FullNW 
+REFGENOMES:= hairpin hg19
+STRATEGIES:= all none random
 
-SAMPLES := RB525T WERI01 WERI02
+#assume this is illumina-graded and not adapter-trim
+novo_loose := $(NOVOALIGN)  -l 17 -h 60 -t 65 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
+novo_tight := $(NOVOALIGN)  -l 17 -h 0 -t 0 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
+SAMPLES := RB494N RB494T RB495N RB495T RB498N RB498T RB517T RB525T 
+
 
 #Target filenames
 FASTQ_FILES :=          $(addsuffix .fq,$(addprefix $(FASTQDIR)/,$(SAMPLES)))
-SAM_FILES :=            $(addsuffix .sam,$(addprefix $(BAMDIR)/,$(SAMPLES)))
+
+
+COUNT_FILES :=		$(FASTQ_FILES:.fq=.cnt)
+SAMS :=                 $(addsuffix .sam,$(SAMPLES))
+SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/$(paramSet)/$(ref)/$(strat)/,$(SAMS))))))
+
 BAM_FILES:=             $(SAM_FILES:.sam=.bam)
 BAI_FILES:=             $(BAM_FILES:.bam=.bam.bai)
 RCS_FILES:=             $(addsuffix .rcs,$(addprefix $(RCSDIR)/,$(SAMPLES)))
-
-
 
 DOWNSTREAM_TARGETS:=  $(SAM_FILES) $(BAM_FILES) $(BAI_FILES)
 
@@ -30,6 +46,7 @@ bai: $(BAI_FILES)
 bam: $(BAM_FILES)
 sam: $(SAM_FILES)
 fastq: $(FASTQ_FILES)
+count: $(COUNT_FILES)
 rcs: $(RCS_FILES)
 
 clean:
@@ -37,19 +54,27 @@ clean:
 
 .PHONY : clean solexa all bai sam bam fastq
 
-#align
-$(BAMDIR)/%.sam: $(FASTQDIR)/%.fq
-	$(NOVOCMD) -f $< -d $(REFS)/$(GENOME)  > $@
+define align
+ $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam: $(FASTQDIR)/%.fq
+	mkdir -p $(BAMDIR)/$(1)/$(2)/$(3)/$(4)
+	$($(1)_$(2)) -r $(4) -f $$< -d $(REFS)/$(3).ndx > $$@    
+endef
 
-#sam2bam
-$(BAMDIR)/%.bam: $(BAMDIR)/%.sam
-	samtools view -b -S $< -t $(REFS)/$(TEMPLATE) > $@_tmp
-	samtools sort $@_tmp $(BAMDIR)/$*
-	rm $@_tmp
+$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call align,$(aligner),$(paramSet),$(ref),$(strat)))))))
+
+#we could limit this to just the ref but this is an easier copy-paste job from align
+define sam2bam
+ $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam
+	$(SAMTOOLS) view -b -S $$< -t $(REFS)/$(3).fa > $$@
+ $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp
+	$(SAMTOOLS) sort $$< $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/$$*
+endef
+
+$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call sam2bam,$(aligner),$(paramSet),$(ref),$(strat)))))))
 
 #index
-$(BAMDIR)/%.bam.bai: $(BAMDIR)/%.bam
-	samtools index $<
+%.bam.bai: %.bam
+	$(SAMTOOLS) index $<
 
 $(RCSDIR)/%.rcs: $(FASTQDIR)/%.fq
 	cat $< | fastx_trimmer -l 26 -Q 33 | fastx_collapser -Q 33 | fasta_formatter -t | perl -ne 'm/\d+\-(\d+)\t(\S+)/;print $$2."\t".$$1."\n";' > $@

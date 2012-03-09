@@ -50,31 +50,17 @@ library(ggplot2)
 library(xtable)
 source("concat.R")
 sessInfo<-sessionInfo()
-hiseqDataDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/data/"
-solexaDataDir<-"/nas/is1/leipzig/Ganguly/doSolexa/"
-ionDataDir<-"/nas/is1/leipzig/Ganguly/RB525T_PGM/"
-bamDirectory<-"bam/"
-outputDir="/nas/is1/leipzig/Ganguly/gangulyRBhi/results/"
-hiseqconds<-c("N","T","N","T","N","T","T","T")
-hiseqsamples<-c("RB494N","RB494T","RB495N","RB495T","RB498N","RB498T","RB517T","RB525T")
-solexaconds<-c("T","T","T","T","N")
-solexasamples<-c("FGC0031_s_8.WERI","FGC0036_s_1.Y79","FGC0036_s_2.WERI","FGC0036_s_2.Y79","FGC0042_s_1.normal")
-solexaprettynames<-c("31s8_WERI","36s1_Y79","36s2_WERI","36s2_Y79","42s1_nrml")
-ionconds<-c("T")
-ionsamples<-c("RB525T")
-ionprettynames<-c("RB525T_PGM")
-hiseqbamPaths<-concat(hiseqDataDir,bamDirectory,hiseqsamples,'.hairpin.sam.sorted.bam')
-solexabamPaths<-concat(solexaDataDir,bamDirectory,solexasamples,'.bam')
-ionbamPaths<-concat(ionDataDir,bamDirectory,ionsamples,'.bam')
-bamPaths<-c(hiseqbamPaths,solexabamPaths,ionbamPaths)
-samples<-c(hiseqsamples,solexaprettynames,ionprettynames)
-names(bamPaths)<-samples
-bamconds<-c(hiseqconds,solexaconds,ionconds)
-bamSamples<-DataFrame(conds=bamconds,row.names=samples)
 
-bamView<-BamViews(bamPaths=bamPaths,
-bamSamples=bamSamples)
 
+
+
+
+
+source("dirConfig.R")
+
+
+
+bamView<-BamViews(bamPaths=bamPaths,bamSamples=bamSamples)
 bamcounts<-countBam(bamView)
 
 
@@ -82,7 +68,7 @@ bamcounts<-countBam(bamView)
 rpmNormalize<-FALSE
 minCount<-200
 
-hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
+hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hairpin.fa",sep=""),use.names=TRUE)
 names(hairpins)<-str_match(names(hairpins),"^\\S+") 
 hairpinLookup<-function(x){as.character(hairpins)[x]}
 hairpinGR<-GRanges(names(hairpins),IRanges(1,width(hairpins)),strand="*")
@@ -100,18 +86,21 @@ uncasted<-ddply(as.data.frame(bamPaths),.(bamPaths),.fun=mirna)
 counts<-cast(uncasted,miRNA ~ variable,value="reads")
 
 #technical replicates
-counts$WERI<-counts[,'31s8_WERI']+counts[,'36s2_WERI']
+counts$WERI<-counts[,'31s8_WERI']+counts[,'36s2_WERI']+counts[,'WERI01_PGM']+counts[,'WERI02_PGM']+counts[,'WERI03_PGM']
 counts$Y79<-counts[,'36s1_Y79']+counts[,'36s1_Y79']
+counts$RB525T<-counts[,'RB525T']+counts[,'RB525T01_PGM']+counts[,'RB525T02_PGM']+counts[,'RB525T03_PGM']
 counts<-counts[,!str_detect(colnames(counts),'^3')]
+counts<-counts[,!str_detect(colnames(counts),'WERI.*PGM')]
+counts<-counts[,!str_detect(colnames(counts),'RB525T.*PGM')]
 #this messes up the id.var so matrix doesn't work
 
-#42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T   WERI    Y79
-conds<-c('N','N','T','N','T','N','T','T','T','T','T','T')
-individual<-c(1,2,2,3,3,4,4,5,6,7,8,6)
-replicate<-c(1,1,2,1,2,1,2,2,2,2,2,2)
-type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx','PGM')
+#42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T    WERI    Y79 (11 groups)
+conds<-c('N','N','T','N','T','N','T','T','T','T','T')
+individual<-c(1,2,2,3,3,4,4,5,6,7,8)
+replicate<-c(1,1,2,1,2,1,2,2,2,2,2)
+type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx')
 pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual)
-rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79','RB525T_PGM')
+rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
 countsMatrix<-as.matrix(counts[,-1])
 rownames(countsMatrix)<-counts$miRNA
 colnames(countsMatrix)<-colnames(counts[,-1])
@@ -129,8 +118,8 @@ cds <- estimateSizeFactors( cds )
 
 #fits: parameteric or local
 #methods: pooled per-condition
-#sharingMode="fit-only" gene-est-only
-sharingMode<-'gene-est-only'
+#sharingMode="fit-only" gene-est-only maximum 
+sharingMode<-'maximum'
 method<-'per-condition'
 fits<-'local'
 cds <- estimateDispersions( cds , fitType="local", method='per-condition', sharingMode=sharingMode)
@@ -171,9 +160,14 @@ Twelve samples, three cohorts of normal and retinoblastoma tissues were collecte
        \item Y79 36s1 and 36s2 technical replicates \Sexpr{formatC(bamcounts[['36s1_Y79']]$records+bamcounts[['36s2_Y79']]$records, format="d", big.mark=',')} alignments
        \item 42s1\_nrml \Sexpr{formatC(bamcounts[['42s1_nrml']]$records, format="d", big.mark=',')} alignments
     \end{enumerate}
-    \item Ion Torrent PGM
+    \item Ion Torrent PGM: these are considered technical replicates of existing samples (WERI and RB525T) 
     \begin{enumerate}
-    \item RB525T\_PGM \Sexpr{formatC(bamcounts$RB525T_PGM$records, format="d", big.mark=',')} alignments
+    \item WERI01\_PGM \Sexpr{formatC(bamcounts$WERI01_PGM$records, format="d", big.mark=',')} alignments
+    \item WERI02\_PGM \Sexpr{formatC(bamcounts$WERI02_PGM$records, format="d", big.mark=',')} alignments
+    \item WERI03\_PGM \Sexpr{formatC(bamcounts$WERI03_PGM$records, format="d", big.mark=',')} alignments
+    \item RB525T01\_PGM \Sexpr{formatC(bamcounts$RB525T01_PGM$records, format="d", big.mark=',')} alignments
+    \item RB525T02\_PGM \Sexpr{formatC(bamcounts$RB525T02_PGM$records, format="d", big.mark=',')} alignments
+    \item RB525T03\_PGM \Sexpr{formatC(bamcounts$RB525T03_PGM$records, format="d", big.mark=',')} alignments
     \end{enumerate}
     \end{itemize}  
 
