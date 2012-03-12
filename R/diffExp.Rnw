@@ -7,7 +7,7 @@
 \pagestyle{fancyplain}
 \lhead{\fancyplain{}{\thepage}}
 \chead{}
-\rhead{\fancyplain{}{\bfseries miRNA HiSeq Analysis}}
+\rhead{\fancyplain{}{\bfseries miRNA Differential Expression}}
 \rfoot{$Rev: 2964 $}
 \cfoot{}
 \lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
@@ -38,7 +38,7 @@
 \maketitle
 \tableofcontents
 \pagebreak
-<<setup,echo=FALSE,results=HIDE>>=
+<<setup,echo=FALSE,results=hide>>=
 library(Rsamtools)
 library(Biostrings)
 library(stringr)
@@ -53,25 +53,33 @@ sessInfo<-sessionInfo()
 
 
 
+aligner<-"novo"
+reference<-"hairpin"
+#alignmentStringency<-"tight"
+alignmentStrategy<-"none"
+alignmentParams<-list()
+alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
+alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
 
-
-
+bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
 source("dirConfig.R")
 
-
-
-bamView<-BamViews(bamPaths=bamPaths,bamSamples=bamSamples)
-bamcounts<-countBam(bamView)
-
-
-
-rpmNormalize<-FALSE
-minCount<-200
 
 hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hairpin.fa",sep=""),use.names=TRUE)
 names(hairpins)<-str_match(names(hairpins),"^\\S+") 
 hairpinLookup<-function(x){as.character(hairpins)[x]}
 hairpinGR<-GRanges(names(hairpins),IRanges(1,width(hairpins)),strand="*")
+
+bamView<-BamViews(bamPaths=bamPaths,bamSamples=bamSamples,bamRanges=hairpinGR)
+bamcounts<-countBam(bamView)
+#,param=ScanBamParam(which=hairpinGR))
+
+
+
+rpmNormalize<-FALSE
+#minCount<-100
+
+
 
 mirna<-function(x){
   xdf<-countBam(file=as.character(x$bamPaths),param=ScanBamParam(which=hairpinGR))[,c("space","records")]
@@ -99,19 +107,24 @@ conds<-c('N','N','T','N','T','N','T','T','T','T','T')
 individual<-c(1,2,2,3,3,4,4,5,6,7,8)
 replicate<-c(1,1,2,1,2,1,2,2,2,2,2)
 type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx')
-pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual)
+paired<-c(FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE)
+pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual,paired=paired)
 rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
-countsMatrix<-as.matrix(counts[,-1])
-rownames(countsMatrix)<-counts$miRNA
-colnames(countsMatrix)<-colnames(counts[,-1])
+
+#at least minCount from the paired lanes
+countsAboveThreshold<-subset(counts,rowSums(counts[,row.names(pdata[which(pdata$paired==TRUE),])])>minCount)
+#subset(counts,rowSums(counts[-1])>minCount)
+
+countsMatrix<-as.matrix(countsAboveThreshold[,-1])
+rownames(countsMatrix)<-countsAboveThreshold$miRNA
+colnames(countsMatrix)<-colnames(countsAboveThreshold[,-1])
 
 
 
-countsAboveThreshold<-subset(countsMatrix,rowSums(countsMatrix)>minCount)
 
 
 
-cds <- newCountDataSet( countsAboveThreshold, pdata$condition )
+cds <- newCountDataSet( countsMatrix, pdata$condition )
 
 
 cds <- estimateSizeFactors( cds )
@@ -119,7 +132,7 @@ cds <- estimateSizeFactors( cds )
 #fits: parameteric or local
 #methods: pooled per-condition
 #sharingMode="fit-only" gene-est-only maximum 
-sharingMode<-'maximum'
+#sharingMode<-'maximum'
 method<-'per-condition'
 fits<-'local'
 cds <- estimateDispersions( cds , fitType="local", method='per-condition', sharingMode=sharingMode)
@@ -145,29 +158,29 @@ Twelve samples, three cohorts of normal and retinoblastoma tissues were collecte
 \begin{itemize}
   \item Illumina HiSeq
   \begin{enumerate}
-     \item RB494N \Sexpr{formatC(bamcounts$RB494N$records, format="d", big.mark=',')} alignments
-     \item RB494T \Sexpr{formatC(bamcounts$RB494N$records, format="d", big.mark=',')} alignments
-     \item RB495N \Sexpr{formatC(bamcounts$RB495N$records, format="d", big.mark=',')} alignments
-     \item RB495T \Sexpr{formatC(bamcounts$RB495T$records, format="d", big.mark=',')} alignments
-     \item RB498N \Sexpr{formatC(bamcounts$RB498N$records, format="d", big.mark=',')} alignments
-     \item RB498T \Sexpr{formatC(bamcounts$RB498T$records, format="d", big.mark=',')} alignments
-     \item RB517T \Sexpr{formatC(bamcounts$RB517T$records, format="d", big.mark=',')} alignments
-     \item RB525T \Sexpr{formatC(bamcounts$RB525T$records, format="d", big.mark=',')} alignments
+     \item RB494N \Sexpr{formatC(sum(bamcounts$RB494N$records), format="d", big.mark=',')} alignments
+     \item RB494T \Sexpr{formatC(sum(bamcounts$RB494N$records), format="d", big.mark=',')} alignments
+     \item RB495N \Sexpr{formatC(sum(bamcounts$RB495N$records), format="d", big.mark=',')} alignments
+     \item RB495T \Sexpr{formatC(sum(bamcounts$RB495T$records), format="d", big.mark=',')} alignments
+     \item RB498N \Sexpr{formatC(sum(bamcounts$RB498N$records), format="d", big.mark=',')} alignments
+     \item RB498T \Sexpr{formatC(sum(bamcounts$RB498T$records), format="d", big.mark=',')} alignments
+     \item RB517T \Sexpr{formatC(sum(bamcounts$RB517T$records), format="d", big.mark=',')} alignments
+     \item RB525T \Sexpr{formatC(sum(bamcounts$RB525T$records), format="d", big.mark=',')} alignments
   \end{enumerate}
   \item Illumina IIfx
     \begin{enumerate}
-       \item WERI 31s8 and 36s2 technical replicates \Sexpr{formatC(bamcounts[['31s8_WERI']]$records + bamcounts[['36s2_WERI']]$records, format="d", big.mark=',')} alignments
-       \item Y79 36s1 and 36s2 technical replicates \Sexpr{formatC(bamcounts[['36s1_Y79']]$records+bamcounts[['36s2_Y79']]$records, format="d", big.mark=',')} alignments
-       \item 42s1\_nrml \Sexpr{formatC(bamcounts[['42s1_nrml']]$records, format="d", big.mark=',')} alignments
+       \item WERI 31s8 and 36s2 technical replicates \Sexpr{formatC(sum(bamcounts[['31s8_WERI']]$records) + sum(bamcounts[['36s2_WERI']]$records), format="d", big.mark=',')} alignments
+       \item Y79 36s1 and 36s2 technical replicates \Sexpr{formatC(sum(bamcounts[['36s1_Y79']]$records)+sum(bamcounts[['36s2_Y79']]$records), format="d", big.mark=',')} alignments
+       \item 42s1\_nrml \Sexpr{formatC(sum(bamcounts[['42s1_nrml']]$records), format="d", big.mark=',')} alignments
     \end{enumerate}
     \item Ion Torrent PGM: these are considered technical replicates of existing samples (WERI and RB525T) 
     \begin{enumerate}
-    \item WERI01\_PGM \Sexpr{formatC(bamcounts$WERI01_PGM$records, format="d", big.mark=',')} alignments
-    \item WERI02\_PGM \Sexpr{formatC(bamcounts$WERI02_PGM$records, format="d", big.mark=',')} alignments
-    \item WERI03\_PGM \Sexpr{formatC(bamcounts$WERI03_PGM$records, format="d", big.mark=',')} alignments
-    \item RB525T01\_PGM \Sexpr{formatC(bamcounts$RB525T01_PGM$records, format="d", big.mark=',')} alignments
-    \item RB525T02\_PGM \Sexpr{formatC(bamcounts$RB525T02_PGM$records, format="d", big.mark=',')} alignments
-    \item RB525T03\_PGM \Sexpr{formatC(bamcounts$RB525T03_PGM$records, format="d", big.mark=',')} alignments
+    \item WERI01\_PGM \Sexpr{formatC(sum(bamcounts$WERI01_PGM$records), format="d", big.mark=',')} alignments
+    \item WERI02\_PGM \Sexpr{formatC(sum(bamcounts$WERI02_PGM$records), format="d", big.mark=',')} alignments
+    \item WERI03\_PGM \Sexpr{formatC(sum(bamcounts$WERI03_PGM$records), format="d", big.mark=',')} alignments
+    \item RB525T01\_PGM \Sexpr{formatC(sum(bamcounts$RB525T01_PGM$records), format="d", big.mark=',')} alignments
+    \item RB525T02\_PGM \Sexpr{formatC(sum(bamcounts$RB525T02_PGM$records), format="d", big.mark=',')} alignments
+    \item RB525T03\_PGM \Sexpr{formatC(sum(bamcounts$RB525T03_PGM$records), format="d", big.mark=',')} alignments
     \end{enumerate}
     \end{itemize}  
 
@@ -180,10 +193,12 @@ The inclusion of multiple members of each family may affect adjustments for mult
 The WERI, Y79 and 42s1\_nrml sequences were adapter-trimmed using Cutadapt due to 3' barcoding. Novoalign was used to trim the HiSeq sequences.
 The Ion Torrent sequences were pre-trimmed.
 
+In this report we used a \Sexpr{alignmentStringency} alignment stringency.
+
 The Novoalign command used for the HiSeq samples is as follows:
 \begin{verbatim}
 novoalign -a ATCTCGTATGCCGTCTTCTGCTTG -d hairpin.ndx -F ILMFQ 
--f FASTQ_FILE.fq -m -l 17 -h 60 -t 65 -o sam -o FullNW
+-f FASTQ_FILE.fq \Sexpr{alignmentParams[[alignmentStringency]]} -o sam -o FullNW
 \end{verbatim}
 
 \subsection{DESeq}
@@ -206,7 +221,7 @@ The following, sharing modes, which determine how much information is used to in
 
 For this report, we have used the \Sexpr{method} method and \Sexpr{sharingMode} sharing mode.
 
-Only miRNAs with a combined count of \Sexpr{minCount} among all samples were considered.
+Only miRNAs with a combined count of \Sexpr{minCount} among all the paired samples (RB494,RB495,RB498) were considered.
 \Sexpr{nrow(countsAboveThreshold)} miRNAs fit this criteria.
 
 \pagebreak
@@ -270,7 +285,7 @@ print(q)
 \pagebreak
 \subsection{hsa-let heatmap and dendrogram}
 <<letheat,fig=TRUE,echo=F>>=
-heatmap(countsAboveThreshold[substr(rownames(countsAboveThreshold),0,7)=='hsa-let',],Rowv=NA,keep.dendro=FALSE,labRow=NULL)
+heatmap(countsMatrix[substr(rownames(countsMatrix),0,7)=='hsa-let',],Rowv=NA,keep.dendro=FALSE,labRow=NULL)
 @
 
 \pagebreak
