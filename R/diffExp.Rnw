@@ -10,7 +10,7 @@
 \rhead{\fancyplain{}{\bfseries miRNA Differential Expression}}
 \rfoot{$Rev: 2964 $}
 \cfoot{}
-\lfoot{\includegraphics[width=0.1\textwidth]{./bicLogo.png}\\[1cm]}
+\lfoot{\includegraphics[width=0.1\textwidth]{/nas/is1/leipzig/src/R/bicLogo.png}\\[1cm]}
 
 
 %hyperlink setup
@@ -48,7 +48,7 @@ library(reshape)
 library("DESeq")
 library(ggplot2)
 library(xtable)
-source("concat.R")
+
 sessInfo<-sessionInfo()
 
 
@@ -62,7 +62,7 @@ alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
 alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
 
 bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
-source("dirConfig.R")
+source(configFile)
 
 
 hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hairpin.fa",sep=""),use.names=TRUE)

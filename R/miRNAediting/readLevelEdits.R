@@ -20,29 +20,35 @@ registerDoMC()
 #' @keywords bam
 NULL
 
-hiseqDataDir<-"/nas/is1/leipzig/Ganguly/gangulyRBhi/data/"
-solexaDataDir<-"/nas/is1/leipzig/Ganguly/gangulySolexa/RB_miRNA_raw_data/reprocess/"
-bamDirectory<-"bam/"
-outputDir="/nas/is1/leipzig/Ganguly/gangulyRBhi/results/readlevelView/"
-hiseqconds<-c("N","T","N","T","N","T","T","T")
-hiseqsamples<-c("RB494N","RB494T","RB495N","RB495T","RB498N","RB498T","RB517T","RB525T")
-solexaconds<-c("T","T","T","T","N")
-solexasamples<-c("FGC0031_s_8.WERI","FGC0036_s_1.Y79","FGC0036_s_2.WERI","FGC0036_s_2.Y79","FGC0042_s_1.normal")
-solexaprettynames<-c("31s8_WERI","36s1_Y79","36s2_WERI","36s2_Y79","42s1_nrml")
-hiseqbamPaths<-concat(hiseqDataDir,bamDirectory,hiseqsamples,'.hairpin.sam.sorted.bam')
-solexabamPaths<-concat(solexaDataDir,bamDirectory,solexasamples,'.bam')
-bamPaths<-c(hiseqbamPaths,solexabamPaths)
-samples<-c(hiseqsamples,solexaprettynames)
-conds<-c(hiseqconds,solexaconds)
-bamSamples<-DataFrame(conds=conds,row.names=samples)
 
+outputDir="/nas/is1/leipzig/Ganguly/gangulyRBhi/results/readlevelView/"
+
+aligner<-"novo"
+reference<-"hairpin"
+alignmentStringency<-"loose"
+alignmentStrategy<-"none"
+alignmentParams<-list()
+alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
+alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
+
+bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
+configFile<-'/nas/is1/leipzig/src/R/dirConfig.R'
+source(configFile)
+
+
+if(!exists("mirnaSEQ")){
+  x <- mirbaseSEQUENCE
+  mirnaSEQ <- mget(mappedkeys(x), x)
+  x <- mirbaseMATURE
+  mirnaMature<-mget(mappedkeys(x),x)
+}
 #' Render a hairpin sequence properly placed mature sequences
 #'
 #' @param miRNA miRNA name
 #' @keywords manip
 #' @export
 #' @examples
-#' matureOnHairpin('hairpin-let-7a-1')
+#' matureOnHairpin('hsa-let-7a-1')
 #' @return character[]
 matureOnHairpin<-function(miRNA){
   seq<-hairpinLookup(miRNA)
@@ -56,6 +62,130 @@ matureOnHairpin<-function(miRNA){
   concat(seq,dashstr,sep=newline)
 }
 
+getMature<-function(miRNA){
+  mat<-NULL
+  mat<-mirnaMature[miRNA][[1]]
+  #some of these are listed without the -1
+  if(is.null(mat)){mat<-mirnaMature[str_replace(miRNA,pattern="-[0-9]+$",replacement='')][[1]]}
+  #some of these are listed without the a/b f
+  if(is.null(mat)){mat<-mirnaMature[str_replace(miRNA,pattern="[ab]$",replacement='')][[1]]}
+  #if(is.null(mat)){stop(concat("can't find the miRNA:",miRNA," in the mature lookup"))}
+  mat
+}
+getRangesOfMature<-function(miRNA){
+  if(is.null(getMature(miRNA))){
+      myrange<-IRanges()
+  }else{
+      myrange<-IRanges(start=matureFrom(getMature(miRNA)),end=matureTo(getMature(miRNA)),names=matureName(getMature(miRNA)))
+  }
+  myrange
+}
+
+getReport<-function(hairpinName,querySeq){
+  hairpin<-hairpinLookup(hairpinName)
+  matRanges<-getRangesOfMature(hairpinName)
+  #mutation at position 10
+  editObj<-calcEdits(hairpin,querySeq)
+  editsRelative(editObj,matRanges)
+}
+
+editsRelative<-function(editObj,matRanges){
+  edits<-tas<-ntas<-isos<-status<-NULL
+  if(length(matRanges)==0){
+    tas<-edits<-ntas<-isos<-"N/A"
+    status<-"No mature data"
+  }else{
+    editRanges<-IRanges(editObj$editList$poss,editObj$editList$poss)
+    editOlap<-findOverlaps(editRanges,matRanges)
+    if(length(editOlap)>0){
+        edits<-formatInternalEdits(editOlap,editObj,matRanges)
+        status<-"Mut"
+    }else{
+      edits<-"None"
+    }
+    
+    #do we catch up to 3 past the end of the mature?
+    flanks<-flank(matRanges,3,start=FALSE,both=FALSE)
+    addOlap<-findOverlaps(editObj$refRanges,flanks)
+    ntaOlap<-findOverlaps(editRanges,flanks)
+    if(length(addOlap)>0){
+      if(length(ntaOlap)>0){
+        #if we have any nt_additions, the whole thing is nt, who are we kidding?
+        tas<-"None"
+        ntas<-formatNTAs(ntaOlap,editObj,matRanges)
+      }else{
+        ntas<-"None"
+        tas<-formatTAs(addOlap,editObj,matRanges)
+      }
+      status<-"Mut"
+    }else{
+      tas<-ntas<-"None"
+    }
+    if(any(editObj$refRanges == matRanges)){
+      status="Exact mature"
+      isos<-"None"
+    }else{
+      #we might consider only exacts to be isomirs
+      #if so add length(editOlap)==0 to these conditions
+      if(length(addOlap)==0){
+        #isomir or outer mature hairpin
+        isoOlap<-findOverlaps(editObj$refRanges,matRanges)
+        if(length(isoOlap)>0){
+          isos<-formatIsomirs(isoOlap,editObj,matRanges)
+          status<-"Mut"
+        }else{
+          isos<-"None"
+          status<-"No mature olap"
+        }
+      }else{
+        isos<-"None"
+        stopifnot(!is.null(status))
+      }
+    }
+  }#mature data available
+  list(editObj=editObj,edits=edits,tas=tas,ntas=ntas,isos=isos,status=status)
+}
+
+formatIsomirs<-function(isomirs,editObj,matRanges){
+  edits<-vector()
+  for(j in seq(length=length(isomirs))){
+    queryHits<-queryHits(isomirs)[j]
+    subjectHits<-subjectHits(isomirs)[j]
+    edits<-c(edits,concat('iso:',start(matRanges[subjectHits])-start(editObj$refRanges[1]),'/',end(editObj$refRanges[1])-end(matRanges[subjectHits])))
+  }
+  if(length(edits)==0){return("None")}else{return(concat(edits,collapse=" "))}
+}
+
+formatTAs<-function(additions,editObj,matRanges){
+  edits<-vector()
+  for(j in seq(length=length(additions))){
+    queryHits<-queryHits(additions)[j]
+    subjectHits<-subjectHits(additions)[j]
+    edits<-c(edits,concat('TA:',end(editObj$refRanges[1])-end(matRanges[subjectHits])))
+  }
+  if(length(edits)==0){return("None")}else{return(concat(edits,collapse=" "))}
+}
+  
+formatNTAs<-function(nt_additions,editObj,matRanges){
+  edits<-vector()
+  for(j in seq(length=length(nt_additions))){
+    queryHits<-queryHits(nt_additions)[j]
+    subjectHits<-subjectHits(nt_additions)[j]
+    edits<-c(edits,concat(editObj$editList$poss[queryHits]-start(matRanges[subjectHits])+1,'NTA:',editObj$editList$nucs[queryHits],sep=''))
+  }
+  if(length(edits)==0){return("None")}else{return(concat(edits,collapse=" "))}
+}
+
+  
+formatInternalEdits<-function(internalEdits,editObj,matRanges){
+  edits<-vector()
+  for(j in seq(length=length(internalEdits))){
+    queryHits<-queryHits(internalEdits)[j]
+    subjectHits<-subjectHits(internalEdits)[j]
+   edits<-c(edits,concat(editObj$editList$poss[queryHits]-start(matRanges[subjectHits])+1,editObj$editList$muts[queryHits],':',editObj$editList$refs[queryHits],'>',editObj$editList$nucs[queryHits],sep=''))
+  }
+  if(length(edits)==0){return("None")}else{return(concat(edits,collapse=" "))}
+}
 #' Concatenate SQL-style
 #' This is like paste but returns NULL anytime one of the given strings is NULL
 #'
@@ -98,11 +228,13 @@ calcEdits<-function(targetseq,queryseq,N_is_reference=TRUE){
   #used for identifying the edits
   seq_poss_sub<-unlist(pwa@subject@mismatch)
   
+  
   #pattern indels is given relative to the subject
   #pattern: [15] TCCCTGAGACCCTT-TAACCTGT 
   #subject:  [1] TCCCTGAGACCCTTTTAACCTGT 
   #"30i"
-  target_poss_indel_ins<-concat(as.character(start(unlist(pwa@pattern@indel))+pwa@pattern@range@start),'i',sep='')
+  #target_poss_indel_ins<-concat(as.character(start(unlist(pwa@pattern@indel))+pwa@pattern@range@start),'i',sep='')
+  target_poss_indel_ins<-start(unlist(pwa@pattern@indel))+pwa@pattern@range@start-2
   seq_poss_indel_ins<-start(unlist(pwa@pattern@indel))
   
   
@@ -112,14 +244,20 @@ calcEdits<-function(targetseq,queryseq,N_is_reference=TRUE){
   #              TCCCTGAGACCCTT-AACCTGTG
   #pattern: [15] TCCCTGAGACCCTTTAACCTGTG 
   #subject:  [1] TCCCTGAGACCCTT-AACCTGTG 
-  target_poss_indel_del<-concat(as.character(start(unlist(pwa@subject@indel))+pwa@pattern@range@start-1),'d',sep='')
+  #target_poss_indel_del<-concat(as.character(start(unlist(pwa@subject@indel))+pwa@pattern@range@start-1),'d',sep='')
+  target_poss_indel_del<-start(unlist(pwa@subject@indel))+pwa@pattern@range@start-1
   seq_poss_indel_del<-start(unlist(pwa@subject@indel))
+  
   
   target_poss<-c(target_poss_sub,target_poss_indel_ins,target_poss_indel_del)
   seq_poss<-c(seq_poss_sub,seq_poss_indel_del,seq_poss_indel_ins)
   
+  mut_types<-c(rep('s',length(seq_poss_sub)),rep('i',length(seq_poss_indel_ins)),rep('d',length(seq_poss_indel_del)))
+
+  
   nucs<-strsplit(queryseq,'')[[1]][seq_poss]
-  edits<-data.frame(nucs=nucs,poss=target_poss)
+  refs<-strsplit(targetseq,'')[[1]][target_poss]
+  edits<-data.frame(nucs=nucs,refs=refs,poss=target_poss,muts=mut_types)
   editList<-list()
   if(N_is_reference){
     editList<-as.list(edits[edits$nucs!='N',])
@@ -132,7 +270,7 @@ calcEdits<-function(targetseq,queryseq,N_is_reference=TRUE){
   
   #formatEdits(nucs,target_poss)
   
-  list(editList=editList,spacedSeq=spacedSeq)
+  list(editList=editList,refRanges=pwa@pattern@range,spacedSeq=spacedSeq)
 }
 
 maskedEdits<-function(subject,pattern){
@@ -142,26 +280,51 @@ maskedEdits<-function(subject,pattern){
 formatEdits<-function(editList){
   edits<-vector()
   for(j in 1:length(editList$poss)){
-   edits<-c(edits,concat(editList$poss[j],editList$nucs[j],sep=':'))
+   edits<-c(edits,concat(editList$poss[j],':',editList$refs[j],'>',editList$nucs[j],sep=''))
   }
   if(length(edits)==0){return("None")}else{return(concat(edits,collapse=" "))}
 }
 
-readlevel<-function(x){
-   x$seq<-as.character(x$seq)
-   x$qual<-as.character(x$qual)
-   if(length(x$seq)>0){
-       df<-as.data.frame(x)
-       udf<-ddply(df,.(rname,seq),.fun=function(x){
-            tmp <- x[1,]
-            edits<-fetchEdits(hairpinLookup(as.character(tmp$rname)),as.character(tmp$seq))
-            data.frame(spacedSeq=edits$spacedSeq,edits=formatEdits(edits$editList),nrow=nrow(x))
-       })
+genEditRep<-function(x){
+            if(nrow(x)>0){
+              tmp <- x[1,]
+              #cat(paste(as.character(tmp$rname),as.character(tmp$seq),"\n"))
+             #editReport<-getReport("hsa-let-7a-1","TGGAGGTAGTAGGTTGTATAGTTTTA")
+              editReport<-getReport(as.character(tmp$rname),as.character(tmp$seq))
+              return(data.frame(spacedSeq=editReport$editObj$spacedSeq,edits=editReport$edits,tas=editReport$tas,ntas=editReport$ntas,isos=editReport$isos,status=editReport$status,nrow=nrow(x)))
+            }else{
+              return(NULL)
+            }
+}
+readlevel<-function(abam){
+   abam$seq<-as.character(abam$seq)
+   abam$qual<-as.character(abam$qual)
+   udf<-NULL
+   if(length(abam$seq)>0){
+       df<-as.data.frame(abam)
+       udf<-ddply(df,.(rname,seq),genEditRep)
   }
+  return(udf)
 }
                    
+testRD<-function(i){
+  cat(i)
+  abam<-ubams[[i]]
+  abam$seq<-as.character(abam$seq)
+  abam$qual<-as.character(abam$qual)
+  df<-as.data.frame(abam)
+  if(nrow(df)>0){
+    genEditRep(df[1,])
+  }
+}
+#for(i in 1:length(ubams)){testRD(i)}
 
-
+testReadLevel<-function(i){
+  cat(i)
+  abam<-ubams[[i]]
+  udf<-readlevel(abam)
+}
+#for(i in 1:length(ubams)){testReadLevel(i)}  
 ##main
 getBams<-function(){
 
@@ -178,14 +341,10 @@ getBams<-function(){
   unlist(bams)
 }
 
-#if(!exists("mirnaSEQ")){
-  #x <- mirbaseSEQUENCE
-  #mirnaSEQ <- mget(mappedkeys(x), x)
-  #x <- mirbaseMATURE
-  #mirnaMature<-mget(mappedkeys(x),x)
 
 
-  hairpins <- read.DNAStringSet(paste(hiseqDataDir,"refs/hsa_hairpin.dna.fa",sep=""),use.names=TRUE)
+
+  hairpins <- read.DNAStringSet(paste(refsDir,"/hairpin.fa",sep=""),use.names=TRUE)
   names(hairpins)<-str_match(names(hairpins),"^\\S+") 
   hairpinLookup<-function(x){as.character(hairpins)[x]}
   
@@ -205,16 +364,22 @@ getBams<-function(){
   ureadlevel<-ldply(ubams,.fun=readlevel,.parallel=TRUE,.progress="none")
   if(nrow(ureadlevel)==0){stop("empty result set")}
   
+  #value","variable")
   ureadlevel$sample<-str_split_fixed(ureadlevel$.id,'\\.',2)[,1]
-  names(ureadlevel)<-c("id","rname","seq","spacedSeq","edits","value","variable")
+  names(ureadlevel)<-c("id","rname","seq","spacedSeq","edits","tas","ntas","isos","status","value","variable")
   recasted<-cast(ureadlevel[,-1],fun.aggregate=sum)
+
+  badSeqs<-scan("/nas/is1/leipzig/notmirna.txt",what=character())
+  badDNA<-DNAStringSet(badSeqs)
+  recasted$bad<-str_replace_all(recasted$spacedSeq[1],' ','') %in% badDNA
+
 
   #for rstudio display
   res<-as.data.frame(recasted)
   d_ply(recasted,.(rname),.fun=function(x){
-        save(x,file=concat("readlevels/",x$rname[1],".RData"),compress=TRUE)
+        save(x,file=concat(outputDir,"/readlevels/",x$rname[1],".RData"),compress=TRUE)
         names(x)<-str_replace_all(names(x),'RB','')
         excelTable<-x[mixedorder(x$edits),]
         names(excelTable)[3]<-hairpinLookup(x$rname[1])
-        write.csv(excelTable,file=concat("csv/",x$rname[1],"csv",sep="."))
+        write.csv(excelTable,file=concat(outputDir,"csv/",x$rname[1],"csv",sep="."))
   })

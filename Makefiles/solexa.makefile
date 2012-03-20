@@ -24,7 +24,7 @@ STRATEGIES:= all none random
 MIN_LENGTH := 15
 
 #assume this is sanger-graded
-novo_loose := $(NOVOALIGN)  -l 17 -h 60 -t 65 -o sam -o FullNW 
+novo_loose := $(NOVOALIGN)  -l 17 -h 60 -t 60 -o sam -o FullNW 
 novo_tight := $(NOVOALIGN)  -l 17 -h 0 -t 0 -o sam -o FullNW
 
 #Sample info, some emerge from debarcoding, some are ready to go
@@ -155,7 +155,16 @@ $(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(
 %.bam.bai: %.bam
 	$(SAMTOOLS) index $<
 
-$(RCSDIR)/%.rcs: $(FASTQDIR)/%.fq
+$(RCSDIR)/%.rcs: $(DECODEDDIR)/%.fq
 	cat $< | fastx_trimmer -l 26 -Q 33 | fastx_collapser -Q 33 | fasta_formatter -t | perl -ne 'm/\d+\-(\d+)\t(\S+)/;print $$2."\t".$$1."\n";' > $@
 
+
+
+%.cnt:%.fq
+	../exe/fastq-grep -c '.*' $< > $@
+
+notmirnafiles:=$(addsuffix .notmirna.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
+notmirna:$(notmirnafiles)
+%.notmirna.txt:%.bam
+	intersectBed -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | uniq > $@
 
