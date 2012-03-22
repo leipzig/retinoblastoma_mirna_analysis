@@ -367,19 +367,43 @@ getBams<-function(){
   #value","variable")
   ureadlevel$sample<-str_split_fixed(ureadlevel$.id,'\\.',2)[,1]
   names(ureadlevel)<-c("id","rname","seq","spacedSeq","edits","tas","ntas","isos","status","value","variable")
-  recasted<-cast(ureadlevel[,-1],fun.aggregate=sum)
+  #recasted<-cast(ureadlevel[,-1],fun.aggregate=sum)
+  #let's use spacedSeq
+  recasted<-cast(ureadlevel[,c(-1,-3)],fun.aggregate=sum)
+  notmirna<-DNAStringSet(scan("/nas/is1/leipzig/notmirna.txt",what=character()))
+  tRNAs<-DNAStringSet(scan("/nas/is1/leipzig/notmirna.txt",what=character()))
 
-  badSeqs<-scan("/nas/is1/leipzig/notmirna.txt",what=character())
-  badDNA<-DNAStringSet(badSeqs)
-  recasted$bad<-str_replace_all(recasted$spacedSeq[1],' ','') %in% badDNA
+  recasted$query<-str_replace_all(recasted$spacedSeq,' ','')
+  recasted$mismap<-FALSE
+  recasted$mismap[recasted$query %in% notmirna]<-TRUE
+  recasted$mismap[recasted$query %in% tRNAs]<-TRUE
+
+  #find possible cross-mappings between miRNAs
+  autoMismap<-recasted[,c('query','rname')]
+  possiblyAmbiguous<-autoMismap[autoMismap$query %in% which(table(autoMismap$query)>1),]
+  possiblyCast<-cast(possiblyAmbiguous,fun.aggregate=length)
+  crossmirreport<-adply(possiblyCast,1,function(x){data.frame(query=x$query,hits=paste(colnames(possiblyCast)[which(x==1)],collapse=","))})[,c("query","hits")]
+  recasted<-merge(recasted,crossmirreport,by="query",all.x=TRUE)
 
 
+
+  save(recasted,file=concat(outputDir,"/recasted.RData"),compress=TRUE)
   #for rstudio display
   res<-as.data.frame(recasted)
-  d_ply(recasted,.(rname),.fun=function(x){
-        save(x,file=concat(outputDir,"/readlevels/",x$rname[1],".RData"),compress=TRUE)
-        names(x)<-str_replace_all(names(x),'RB','')
-        excelTable<-x[mixedorder(x$edits),]
-        names(excelTable)[3]<-hairpinLookup(x$rname[1])
-        write.csv(excelTable,file=concat(outputDir,"csv/",x$rname[1],"csv",sep="."))
+
+  nomismaps<-subset(recasted,mismap==FALSE)
+  nomismaps$rowsum<-rowSums(nomismaps[,samples])
+  nomismaps<-subset(nomismaps,rowSums(nomismaps[,hiseqsamples]>0)>3)
+
+  disp_df <- within(nomismaps, rm(mismap,query,status))
+  disp_df$hits[is.na(disp_df$hits)]<-''
+  #3 of the 6 matched samples must have this
+  d_ply(disp_df,.(rname),.fun=function(x){
+        if(sum(colSums(x[,hiseqsamples])>100)>3){
+          save(x,file=concat(outputDir,"/readlevels/",x$rname[1],".RData"),compress=TRUE)
+          names(x)<-str_replace_all(names(x),'RB','')
+          excelTable<-x[mixedorder(x$edits),]
+          names(excelTable)[2]<-hairpinLookup(x$rname[1])
+          write.csv(excelTable,file=concat(outputDir,"csv/",x$rname[1],".csv",sep=""))
+        }
   })

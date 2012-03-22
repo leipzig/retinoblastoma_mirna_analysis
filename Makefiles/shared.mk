@@ -1,31 +1,10 @@
-#assume this is illumina-graded and not adapter-trim
-novo_loose := $(NOVOALIGN)  -l 17 -h 60 -t 60 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
-novo_tight := $(NOVOALIGN)  -l 17 -h 0 -t 0 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
-SAMPLES := RB494N RB494T RB495N RB495T RB498N RB498T RB517T RB525T 
-
-
-#Directories
-TOP := $(shell pwd)
-FASTQDIR := $(TOP)/fastq
-BAMDIR := $(TOP)/bam
-SCRIPTDIR := $(TOP)/src
-RCSDIR:= $(TOP)/rcs
-
-#Programs
-SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
-SAMTOOLS:= $(wildcard $(SAM_POSS))
-
-NOVO_POSS:= /share/apps/bin/novoalign /usr/bin/novoalign
-NOVOALIGN:= $(wildcard $(NOVO_POSS))
-
-BEDTOOLS:= $(TOP)/../exe/bedtools/bedtools
-
 #Parameters
 ALIGNERS:= novo
 PARAMSETS:= loose tight
 REFS:= refs
 REFGENOMES:= hairpin hg19 hg19.ambig tRNAs
 STRATEGIES:= all none random
+
 
 
 #Target filenames

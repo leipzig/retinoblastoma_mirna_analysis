@@ -11,14 +11,18 @@ FASTADIR := $(TOP)/fasta
 TRIMMEDDIR := $(TOP)/trimmed
 
 #Programs
-SAMTOOLS:= /share/apps/bin/samtools
-NOVOALIGN:= /share/apps/bin/novoalign
+SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
+SAMTOOLS:= $(wildcard $(SAM_POSS))
+
+NOVO_POSS:= /share/apps/bin/novoalign /usr/bin/novoalign
+NOVOALIGN:= $(wildcard $(NOVO_POSS))
+
 
 #Parameters
 ALIGNERS:= novo
 PARAMSETS:= loose tight
 REFS:= $(TOP)/refs
-REFGENOMES:= hairpin hg19 hg19.ambig
+REFGENOMES:= hairpin hg19 hg19.ambig tRNAs
 STRATEGIES:= all none random
 
 MIN_LENGTH := 15
@@ -52,8 +56,9 @@ READY_FILES:=           $(addsuffix .fq,$(addprefix $(DECODEDDIR)/,$(NONBC_SAMPL
 DECODED_FILES :=        $(addsuffix .fq,$(addprefix $(DECODEDDIR)/,$(SAMPLES)))
 COUNT_FILES :=		$(DECODED_FILES:.fq=.cnt)
 SAMS :=                 $(addsuffix .sam,$(SAMPLES))
+tRNA_SAM_FILES:=	$(addprefix $(BAMDIR)/$(ALIGNERS)/tight/tRNAs/all/,$(SAMS))
 BAMS :=	                $(addsuffix .bam,$(SAMPLES))
-SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/$(paramSet)/$(ref)/$(strat)/,$(SAMS))))))
+SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/$(paramSet)/$(ref)/$(strat)/,$(SAMS))))))  $(tRNA_SAM_FILES)
 BAM_FILES:=             $(SAM_FILES:.sam=.bam)
 UNIQUE_FILES:=		$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/$(paramSet)/$(ref)/unique/,$(BAMS)))))
 
@@ -62,7 +67,7 @@ BAI_FILES:=             $(BAM_FILES:.bam=.bam.bai) $(UNIQUE_FILES:.bam=.bam.bai)
 RCS_FILES:=             $(addsuffix .rcs,$(addprefix $(RCSDIR)/,$(SAMPLES)))
 
 DOWNSTREAM_TARGETS:= $(FASTQ_FILES) $(TRIMMED_FILES) $(DECODED_FILES) $(SAM_FILES)
-
+tRNA_FILES:=	       $(tRNA_SAM_FILES:.sam=.bam.bai)
 #targets
 default: bai rcs count
 bai: $(BAI_FILES)
@@ -75,7 +80,7 @@ uncompressed: $(UNCOMPRESSED_FILES)
 count: $(COUNT_FILES)
 rcs: $(RCS_FILES)
 unique:$(UNIQUE_FILES)
-
+tRNA: $(tRNA_FILES)
 solexa:
 	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0036_s_1_sequence.txt.gz $(SOURCEDIR)/FGC0036_s_1.txt.gz
 	ln -s -f /nas/is1/leipzig/Ganguly/RB_miRNA_raw_data/559-Ganguly-Chao-Solexa/basic/Solexa/FGC0031_s_8_sequence.txt.gz $(SOURCEDIR)/FGC0031_s_8.txt.gz
