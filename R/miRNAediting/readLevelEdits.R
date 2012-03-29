@@ -371,16 +371,26 @@ getBams<-function(){
   #let's use spacedSeq
   recasted<-cast(ureadlevel[,c(-1,-3)],fun.aggregate=sum)
   notmirna<-DNAStringSet(scan("/nas/is1/leipzig/notmirna.txt",what=character()))
-  tRNAs<-DNAStringSet(scan("/nas/is1/leipzig/notmirna.txt",what=character()))
+  tRNAs<-DNAStringSet(scan("/nas/is1/leipzig/tRNAs.txt",what=character()))
 
   recasted$query<-str_replace_all(recasted$spacedSeq,' ','')
   recasted$mismap<-FALSE
+recasted$tRNA<-FALSE
   recasted$mismap[recasted$query %in% notmirna]<-TRUE
-  recasted$mismap[recasted$query %in% tRNAs]<-TRUE
+  recasted$tRNA[recasted$query %in% tRNAs]<-TRUE
 
   #find possible cross-mappings between miRNAs
   autoMismap<-recasted[,c('query','rname')]
-  possiblyAmbiguous<-autoMismap[autoMismap$query %in% which(table(autoMismap$query)>1),]
+#   possiblyAmbiguous<-autoMismap[autoMismap$query %in% which(table(autoMismap$query)>1),]
+#   possiblyAmbiguous<-autoMismap[autoMismap$query %in%  autoMismap$query[which(table(autoMismap$query)>1)]
+#   possiblyAmbiguous<-autoMismap[autoMismap$query %in%  autoMismap$query[which(table(autoMismap$query)>1)],]
+#   possiblyAmbiguous<-autoMismap[autoMismap$query %in% which(table(autoMismap$query)>1),]
+#   possiblyAmbiguous<-autoMismap[autoMismap$query %in%  autoMismap$query[which(table(autoMismap$query)>1)]
+possiblyAmbiguous<-autoMismap[autoMismap$query %in% names(which((table(autoMismap$query)>1))),]
+
+  possiblyAmbiguous$value<-1
+  colnames(possiblyAmbiguous)<-c("query","variable","value")
+
   possiblyCast<-cast(possiblyAmbiguous,fun.aggregate=length)
   crossmirreport<-adply(possiblyCast,1,function(x){data.frame(query=x$query,hits=paste(colnames(possiblyCast)[which(x==1)],collapse=","))})[,c("query","hits")]
   recasted<-merge(recasted,crossmirreport,by="query",all.x=TRUE)
@@ -395,7 +405,7 @@ getBams<-function(){
   nomismaps$rowsum<-rowSums(nomismaps[,samples])
   nomismaps<-subset(nomismaps,rowSums(nomismaps[,hiseqsamples]>0)>3)
 
-  disp_df <- within(nomismaps, rm(mismap,query,status))
+  disp_df <- within(nomismaps, rm(query,status))
   disp_df$hits[is.na(disp_df$hits)]<-''
   #3 of the 6 matched samples must have this
   d_ply(disp_df,.(rname),.fun=function(x){

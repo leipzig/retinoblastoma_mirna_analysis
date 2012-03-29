@@ -1,94 +1,25 @@
+fastq:
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_7/HWI-ST431_52_7_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_7_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_6/HWI-ST431_52_6_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_6_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_5/HWI-ST431_52_5_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_5_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_4/HWI-ST431_52_4_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_4_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_3/HWI-ST431_52_3_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_3_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_2/HWI-ST431_52_2_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_2_1.export.txt.fq
+	ln -s /nas/is1/leipzig/Ganguly/gangulyRBhi/flowcell17/lane_1/HWI-ST431_52_1_1.export.txt.fq  $$PWD/fastq/HWI-ST431_52_1_1.export.txt.fq
+	ln -s $$PWD/fastq/HWI-ST431_53_8_1.export.txt.fq  $$PWD/fastq/RB525T.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_7_1.export.txt.fq  $$PWD/fastq/RB517T.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_6_1.export.txt.fq  $$PWD/fastq/RB498T.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_5_1.export.txt.fq  $$PWD/fastq/RB498N.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_4_1.export.txt.fq  $$PWD/fastq/RB495T.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_3_1.export.txt.fq  $$PWD/fastq/RB495N.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_2_1.export.txt.fq  $$PWD/fastq/RB494T.fq
+	ln -s $$PWD/fastq/HWI-ST431_52_1_1.export.txt.fq  $$PWD/fastq/RB494N.fq
+
+include ../progdir.mk
+
 #assume this is illumina-graded and not adapter-trim
 novo_loose := $(NOVOALIGN)  -l 17 -h 60 -t 60 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
 novo_tight := $(NOVOALIGN)  -l 17 -h 0 -t 0 -o sam -o FullNW -a ATCTCGTATGCCGTCTTCTGCTTG  -F ILMFQ
 SAMPLES := RB494N RB494T RB495N RB495T RB498N RB498T RB517T RB525T 
 
-
-#Directories
-TOP := $(shell pwd)
-FASTQDIR := $(TOP)/fastq
-BAMDIR := $(TOP)/bam
-SCRIPTDIR := $(TOP)/src
-RCSDIR:= $(TOP)/rcs
-
-#Programs
-SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
-SAMTOOLS:= $(wildcard $(SAM_POSS))
-
-NOVO_POSS:= /share/apps/bin/novoalign /usr/bin/novoalign
-NOVOALIGN:= $(wildcard $(NOVO_POSS))
-
-BEDTOOLS:= $(TOP)/../exe/bedtools/bedtools
-
-#Parameters
-ALIGNERS:= novo
-PARAMSETS:= loose tight
-REFS:= refs
-REFGENOMES:= hairpin hg19 hg19.ambig tRNAs
-STRATEGIES:= all none random
-
-
-#Target filenames
-FASTQ_FILES :=          $(addsuffix .fq,$(addprefix $(FASTQDIR)/,$(SAMPLES)))
-
-
-COUNT_FILES :=		$(FASTQ_FILES:.fq=.cnt)
-SAMS :=                 $(addsuffix .sam,$(SAMPLES))
-tRNA_SAM_FILES:=	        $(addprefix $(BAMDIR)/$(ALIGNERS)/tight/tRNAs/all/,$(SAMS))
-SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/tight/$(ref)/$(strat)/,$(SAMS)))))) $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/loose/hairpin/$(strat)/,$(SAMS)))))) $(tRNA_SAM_FILES)
-
-
-BAM_FILES:=             $(SAM_FILES:.sam=.bam)
-BAI_FILES:=             $(BAM_FILES:.bam=.bam.bai)
-RCS_FILES:=             $(addsuffix .rcs,$(addprefix $(RCSDIR)/,$(SAMPLES)))
-
-#convenience
-tRNA_FILES:=	       $(tRNA_SAM_FILES:.sam=.bam.bai)
-DOWNSTREAM_TARGETS:=  $(SAM_FILES) $(BAM_FILES) $(BAI_FILES)
-
-#targets
-default: bai count notmirna
-bai: $(BAI_FILES)
-bam: $(BAM_FILES)
-sam: $(SAM_FILES)
-fastq: $(FASTQ_FILES)
-count: $(COUNT_FILES)
-rcs: $(RCS_FILES)
-tRNA: $(tRNA_FILES)
-clean:
-	rm -f $(DOWNSTREAM_TARGETS)
-
-.PHONY : clean solexa all bai sam bam fastq
-
-define align
- $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam: $(FASTQDIR)/%.fq
-	mkdir -p $(BAMDIR)/$(1)/$(2)/$(3)/$(4)
-	$($(1)_$(2)) -r $(4) -f $$< -d $(REFS)/$(3).ndx > $$@    
-endef
-
-$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call align,$(aligner),$(paramSet),$(ref),$(strat)))))))
-
-#we could limit this to just the ref but this is an easier copy-paste job from align
-define sam2bam
- $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam
-	$(SAMTOOLS) view -b -S $$< -t $(REFS)/$(3).fa > $$@
- $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp
-	$(SAMTOOLS) sort $$< $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/$$*
-endef
-
-$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call sam2bam,$(aligner),$(paramSet),$(ref),$(strat)))))))
-
-#index
-%.bam.bai: %.bam
-	$(SAMTOOLS) index $<
-
-$(RCSDIR)/%.rcs: $(FASTQDIR)/%.fq
-	cat $< | fastx_trimmer -l 26 -Q 33 | fastx_collapser -Q 33 | fasta_formatter -t | perl -ne 'm/\d+\-(\d+)\t(\S+)/;print $$2."\t".$$1."\n";' > $@
-
-%.cnt:%.fq
-	../exe/fastq-grep -c '.*' $< > $@
-
-notmirnafiles:=$(addsuffix .notmirna.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
-notmirna:$(notmirnafiles)
-%.notmirna.txt:%.bam
-	$(BEDTOOLS) intersect -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | uniq > $@
+include ../shared.mk

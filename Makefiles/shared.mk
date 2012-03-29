@@ -9,11 +9,9 @@ STRATEGIES:= all none random
 
 #Target filenames
 FASTQ_FILES :=          $(addsuffix .fq,$(addprefix $(FASTQDIR)/,$(SAMPLES)))
-
-
 COUNT_FILES :=		$(FASTQ_FILES:.fq=.cnt)
 SAMS :=                 $(addsuffix .sam,$(SAMPLES))
-tRNA_SAM_FILES:=	        $(addprefix $(BAMDIR)/$(ALIGNERS)/tight/tRNAs/all/,$(SAMS))
+tRNA_SAM_FILES:=	$(addprefix $(BAMDIR)/$(ALIGNERS)/tight/tRNAs/all/,$(SAMS))
 SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/tight/$(ref)/$(strat)/,$(SAMS)))))) $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/loose/hairpin/$(strat)/,$(SAMS)))))) $(tRNA_SAM_FILES)
 
 
@@ -30,14 +28,14 @@ default: bai count notmirna
 bai: $(BAI_FILES)
 bam: $(BAM_FILES)
 sam: $(SAM_FILES)
-fastq: $(FASTQ_FILES)
+fastq: linkfastq $(FASTQ_FILES)
 count: $(COUNT_FILES)
 rcs: $(RCS_FILES)
 tRNA: $(tRNA_FILES)
 clean:
 	rm -f $(DOWNSTREAM_TARGETS)
 
-.PHONY : clean solexa all bai sam bam fastq
+.PHONY : linkfastq clean solexa all bai sam bam fastq
 
 define align
  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam: $(FASTQDIR)/%.fq
@@ -67,7 +65,9 @@ $(RCSDIR)/%.rcs: $(FASTQDIR)/%.fq
 %.cnt:%.fq
 	../exe/fastq-grep -c '.*' $< > $@
 
-notmirnafiles:=$(addsuffix .notmirna.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
+notmirnafiles:=$(addsuffix .notmirna.sorted.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
 notmirna:$(notmirnafiles)
 %.notmirna.txt:%.bam
 	$(BEDTOOLS) intersect -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | uniq > $@
+%.notmirna.sorted.txt:%.notmirna.txt
+	cat $< | sort -u -S 150G -T /nas/is1/leipzig/ > $@

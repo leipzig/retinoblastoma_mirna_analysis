@@ -94,4 +94,4 @@ tRNAs.unsorted.txt:
 	for f in do*/bam/novo/tight/tRNAs/all/*bam; do samtools view -F 4 $$f | cut -f 10 >> tRNAs.unsorted.txt; done
 
 notmirna.txt:
-	cat do*/bam/novo/tight/hg19.ambig/all/*.notmirna.txt | sort -u -S 150G --batch-size 256 -u -T /nas/is1/leipzig/ > notmirna.txt
+	sort -m -u do*/bam/novo/tight/hg19.ambig/all/*.notmirna.sorted.txt > notmirna.txt

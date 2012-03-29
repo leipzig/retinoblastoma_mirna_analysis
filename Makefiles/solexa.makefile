@@ -1,22 +1,4 @@
-#Directories
-TOP := $(shell pwd)
-FASTQDIR := $(TOP)/fastq
-BAMDIR := $(TOP)/bam
-SCRIPTDIR := $(TOP)/src
-RCSDIR:= $(TOP)/rcs
-
-SOURCEDIR := $(TOP)/sources
-DECODEDDIR := $(TOP)/decoded
-FASTADIR := $(TOP)/fasta
-TRIMMEDDIR := $(TOP)/trimmed
-
-#Programs
-SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
-SAMTOOLS:= $(wildcard $(SAM_POSS))
-
-NOVO_POSS:= /share/apps/bin/novoalign /usr/bin/novoalign
-NOVOALIGN:= $(wildcard $(NOVO_POSS))
-
+include ../progdir.mk
 
 #Parameters
 ALIGNERS:= novo
@@ -168,8 +150,7 @@ $(RCSDIR)/%.rcs: $(DECODEDDIR)/%.fq
 %.cnt:%.fq
 	../exe/fastq-grep -c '.*' $< > $@
 
-notmirnafiles:=$(addsuffix .notmirna.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
+notmirnafiles:=$(addsuffix .notmirna.sorted.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
 notmirna:$(notmirnafiles)
-%.notmirna.txt:%.bam
-	intersectBed -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | uniq > $@
-
+%.notmirna.sorted.txt:%.bam
+	$(BEDTOOLS) intersect -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | sort -u -S 150G --batch-size 256 -T /nas/is1/leipzig/ > $@
