@@ -4,14 +4,13 @@ loadConfig <- function (aligner, alignmentStringency, reference, alignmentStrate
   alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
   alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
   
-  bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
+  #bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
+  assign("bamDirectory", concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/"), envir=.GlobalEnv)
   configFile<-'/nas/is1/leipzig/src/R/dirConfig.R'
   source(configFile)
 }
 
-
-
-getCounts <- function (bamPaths, bamSamples, samples) {
+getCounts <- function (bamPaths, bamSamples, samples,minCount) {
   knownGenes<-makeTranscriptDbFromUCSC(genome="hg19",
                                        tablename="refGene",
                                        transcript_ids=NULL,
@@ -21,7 +20,6 @@ getCounts <- function (bamPaths, bamSamples, samples) {
                                        )                        
   GR <- transcripts(knownGenes)
   seqlevels(GR,force=TRUE)<-c(concat("chr",1:22),"chrX","chrY","chrM")
-  
   bamView<-BamViews(bamPaths=bamPaths,bamSamples=bamSamples,bamRanges=GR)
   bamcounts<-countBam(bamView)
   bfl <- BamFileList(bamPaths)
@@ -36,10 +34,7 @@ getCounts <- function (bamPaths, bamSamples, samples) {
   counts<-counts[,!str_detect(colnames(counts),'WERI.*PGM')]
   counts<-counts[,!str_detect(colnames(counts),'RB525T.*PGM')]
   #this messes up the id.var so matrix doesn't work
-  counts
-}
-
-getCds <- function (counts,minCount) {
+  
   #42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T    WERI    Y79 (11 groups)
   conds<-c('N','N','T','N','T','N','T','T','T','T','T')
   individual<-c(1,2,2,3,3,4,4,5,6,7,8)
@@ -55,16 +50,18 @@ getCds <- function (counts,minCount) {
   #subset(counts,rowSums(counts[-1])>minCount)
   
   countsMatrix<-as.matrix(countsAboveThreshold)
-  rownames(countsMatrix)<-elementMetadata(rowData(olap))$tx_name
+  rownames(countsMatrix)<-elementMetadata(rowData(olap))$tx_id
   
   colnames(countsMatrix)<-colnames(countsAboveThreshold)
   cds <- newCountDataSet( countsMatrix, pdata$condition )
-  cds
+  list(bamcounts=bamcounts,counts=counts,cds=cds,countsMatrix=countsMatrix)
 }
 
+
 doStats <- function (cds, fits, method, sharingMode) {
-  cds <- estimateDispersions( cds , fitType=fits, method=method, sharingMode=sharingMode)
   cds <- estimateSizeFactors( cds )
+  cds <- estimateDispersions( cds , fitType=fits, method=method, sharingMode=sharingMode)
+
   res <- nbinomTest( cds, "N", "T")
   
   #pds <- newCountDataSet( countsAboveThreshold, pdata )
