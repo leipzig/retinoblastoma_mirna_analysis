@@ -65,9 +65,22 @@ $(RCSDIR)/%.rcs: $(FASTQDIR)/%.fq
 %.cnt:%.fq
 	../exe/fastq-grep -c '.*' $< > $@
 
+#fasta, in case some other program wants that
+$(FASTADIR)/%.fq:$(DECODEDIR)/%.fq
+	fastq_to_fasta < $< > $@
+
+
+#unique
+define unique
+ $(BAMDIR)/$(1)/$(2)/$(3)/unique/%.bam:  $(BAMDIR)/$(1)/$(2)/$(3)/all/%.bam
+	mkdir -p $(BAMDIR)/$(1)/$(2)/$(3)/unique
+	$(SAMTOOLS) view -b -q 1 $$<  > $$@
+endef
+
+
 notmirnafiles:=$(addsuffix .notmirna.sorted.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
-notmirna:$(notmirnafiles)
+notmirna:$(notmirnafiles) $(REFS)/hsa.chr.gff
 %.notmirna.txt:%.bam
-	$(BEDTOOLS) intersect -v -abam $< -b $(REFS)/hsa.chr.gff | samtools view - | cut -f 10 | uniq > $@
+	$(BEDTOOLS) intersect -v -abam $< -b $(REFS)/hsa.chr.gff | $(SAMTOOLS) view - | cut -f 10 | uniq > $@
 %.notmirna.sorted.txt:%.notmirna.txt
 	cat $< | sort -u -S 150G -T /nas/is1/leipzig/ > $@

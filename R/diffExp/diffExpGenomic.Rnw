@@ -8,7 +8,7 @@
 \lhead{\fancyplain{}{\thepage}}
 \chead{}
 \rhead{\fancyplain{}{\bfseries miRNA Differential Expression}}
-\rfoot{$Rev: 2964 $}
+\rfoot{$\Sexpr{system("git rev-parse HEAD")}$}
 \cfoot{}
 \lfoot{\includegraphics[width=0.1\textwidth]{/nas/is1/leipzig/src/R/bicLogo.png}\\[1cm]}
 
@@ -45,16 +45,20 @@ library(plyr)
 library(reshape)
 library(ggplot2)
 library(xtable)
-
+library(DESeq)
 sessInfo<-sessionInfo()
 
 
 
 
 
-
+  alignmentParams<-list()
+  alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
+  alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
+  
 
 load("diffExpGenomic.RData")
+bamcounts<-cList$bamcounts
 
 
 @
@@ -100,12 +104,12 @@ The inclusion of multiple members of each family may affect adjustments for mult
 The WERI, Y79 and 42s1\_nrml sequences were adapter-trimmed using Cutadapt due to 3' barcoding. Novoalign was used to trim the HiSeq sequences.
 The Ion Torrent sequences were pre-trimmed.
 
-In this report we used a \Sexpr{alignmentStringency} alignment stringency.
+In this report we used a \Sexpr{p$alignmentStringency} alignment stringency.
 
 The Novoalign command used for the HiSeq samples is as follows:
 \begin{verbatim}
 novoalign -a ATCTCGTATGCCGTCTTCTGCTTG -d hairpin.ndx -F ILMFQ 
--f FASTQ_FILE.fq \Sexpr{alignmentParams[[alignmentStringency]]} -o sam -o FullNW
+-f FASTQ_FILE.fq \Sexpr{alignmentParams[[p$alignmentStringency]]} -o sam -o FullNW
 \end{verbatim}
 
 \subsection{DESeq}
@@ -126,10 +130,10 @@ The following, sharing modes, which determine how much information is used to in
  \item[gene-est-only] is more aggressive, and is ideal for many replicates
 \end{description}
 
-For this report, we have used the \Sexpr{method} method and \Sexpr{sharingMode} sharing mode.
+For this report, we have used the \Sexpr{p$method} method and \Sexpr{p$sharingMode} sharing mode.
 
-Only miRNAs with a combined count of \Sexpr{minCount} among all the paired samples (RB494,RB495,RB498) were considered.
-\Sexpr{nrow(countsAboveThreshold)} miRNAs fit this criteria.
+Only miRNAs with a combined count of \Sexpr{p$minCount} among all the paired samples (RB494,RB495,RB498) were considered.
+\Sexpr{nrow(cList$countsMatrix)} miRNAs fit this criteria.
 
 \pagebreak
 \subsection{Results}
@@ -138,9 +142,9 @@ Significantly differentially expressed miRNAs. Fold change is retinoblastoma/nor
 
 <<dePval,results=tex,echo=F>>=
 myPval<-.05
-resSig<-subset(res[,1:8],pval < myPval)
+resSig<-subset(res[,1:8],padj < myPval)
 names(resSig)<-c('miRNA','baseMean','bNorm','bRB','fc','log2fc','pval','padj')
-myXtableOne<-xtable(resSig[order(resSig$pval),1:8],type=tex,caption=paste("Significant (P<",myPval,") differential expression before the correction for multiple testing"),display=c('d','s','E','E','E','g','g','g','g'))
+myXtableOne<-xtable(resSig[order(resSig$padj),1:8],type=tex,caption=paste("Significant (Padj<",myPval,") differential expression after the correction for multiple testing"),display=c('d','s','E','E','E','g','g','g','g'))
 
 print(myXtableOne,include.rownames=FALSE, tabular.environment = "longtable", floating = FALSE, size="\\footnotesize")
 @
@@ -179,14 +183,14 @@ print(myXtableThree,include.rownames=FALSE, tabular.environment = "longtable", f
 Genes with high fold change may not be significantly differentially expressed simply due to high variance.
 
 <<fcVsBasemean,echo=FALSE,fig=TRUE>>=
-q<-qplot(log2(res$baseMean),res$log2FoldChange)+aes(color=res$pval<.05)
+q<-qplot(log2(res$baseMean),res$log2FoldChange)+aes(color=res$padj)
 print(q)
 @
 
 \pagebreak
 \subsection{Eucludian distances}
 <<euclidheat,fig=TRUE,echo=F>>=
-dists<-dist(t(counts(cds)))
+dists<-dist(t(counts(cList$cds)))
 heatmap( as.matrix( dists ))
 @
 

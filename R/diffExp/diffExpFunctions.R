@@ -1,16 +1,13 @@
 
 loadConfig <- function (aligner, alignmentStringency, reference, alignmentStrategy) {
-  alignmentParams<-list()
-  alignmentParams[['loose']]<-'-l 17 -h 60 -t 65'
-  alignmentParams[['tight']]<-'-l 17 -h 0 -t 0'
-  
+
   #bamDirectory<-concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/")
   assign("bamDirectory", concat("/bam",aligner,alignmentStringency,reference,alignmentStrategy,"/",sep="/"), envir=.GlobalEnv)
   configFile<-'/nas/is1/leipzig/src/R/dirConfig.R'
   source(configFile)
 }
 
-getCounts <- function (bamPaths, bamSamples, samples,minCount) {
+getGRFromRefGene<-function(){
   knownGenes<-makeTranscriptDbFromUCSC(genome="hg19",
                                        tablename="refGene",
                                        transcript_ids=NULL,
@@ -20,6 +17,18 @@ getCounts <- function (bamPaths, bamSamples, samples,minCount) {
                                        )                        
   GR <- transcripts(knownGenes)
   seqlevels(GR,force=TRUE)<-c(concat("chr",1:22),"chrX","chrY","chrM")
+  GR
+}
+getGRFromGFF<-function(gffFile){
+  #concat(refsDir,"/hsa.chr.gff")
+  gffRangedData<-import.gff(gffFile)
+  mirnaNames<-as.character(str_match(as.character(elementMetadata(GR)$group),"hsa[a-zA-Z0-9-]+"))
+  GR <- as(gffRangedData, "GRanges")
+  names(GR)<-mirnaNames
+  elementMetadata(GR)$tx_id<-mirnaNames
+  GR
+}
+getCounts <- function (GR,bamPaths, bamSamples, samples,minCount) {
   bamView<-BamViews(bamPaths=bamPaths,bamSamples=bamSamples,bamRanges=GR)
   bamcounts<-countBam(bamView)
   bfl <- BamFileList(bamPaths)
@@ -44,13 +53,15 @@ getCounts <- function (bamPaths, bamSamples, samples,minCount) {
   pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual,paired=paired)
   rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
   
-  #at least minCount from the paired lanes
+ 
+  rownames(counts)<-elementMetadata(rowData(olap))$tx_id
   
+  #at least minCount from the paired lanes
   countsAboveThreshold<-subset(counts,rowSums(counts[,row.names(pdata[which(pdata$paired==TRUE),])])>=minCount)
   #subset(counts,rowSums(counts[-1])>minCount)
   
   countsMatrix<-as.matrix(countsAboveThreshold)
-  rownames(countsMatrix)<-elementMetadata(rowData(olap))$tx_id
+  
   
   colnames(countsMatrix)<-colnames(countsAboveThreshold)
   cds <- newCountDataSet( countsMatrix, pdata$condition )

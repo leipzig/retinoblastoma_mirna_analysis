@@ -95,3 +95,7 @@ tRNAs.unsorted.txt:
 
 notmirna.txt:
 	sort -m -u do*/bam/novo/tight/hg19.ambig/all/*.notmirna.sorted.txt > notmirna.txt
+
+refs/hsa.chr.gff:
+	wget ftp://mirbase.org/pub/mirbase/CURRENT/genomes/hsa.gff refs/hsa.gff
+	perl -ne 'unless(/^#/){print "chr".$_}' < refs/hsa.gff > refs/hsa.chr.gff

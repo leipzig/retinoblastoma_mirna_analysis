@@ -7,9 +7,10 @@ RCSDIR:= $(TOP)/rcs
 
 #these are Solexa-specific
 SOURCEDIR := $(TOP)/sources
-DECODEDDIR := $(TOP)/decoded
+DECODEDDIR := $(TOP)/fastq
 FASTADIR := $(TOP)/fasta
 TRIMMEDDIR := $(TOP)/trimmed
+PREFASTQDIR := $(TOP)/prefastq
 
 #Programs
 SAM_POSS:= /share/apps/bin/samtools /usr/bin/samtools
