@@ -2,8 +2,8 @@
 ALIGNERS:= novo
 PARAMSETS:= loose tight
 REFS:= refs
-REFGENOMES:= hairpin hg19 hg19.ambig tRNAs
-STRATEGIES:= all none random
+REFGENOMES:= hairpin hg19.ambig tRNAs
+STRATEGIES:= all random
 
 
 
@@ -12,7 +12,7 @@ FASTQ_FILES :=          $(addsuffix .fq,$(addprefix $(FASTQDIR)/,$(SAMPLES)))
 COUNT_FILES :=		$(FASTQ_FILES:.fq=.cnt)
 SAMS :=                 $(addsuffix .sam,$(SAMPLES))
 tRNA_SAM_FILES:=	$(addprefix $(BAMDIR)/$(ALIGNERS)/tight/tRNAs/all/,$(SAMS))
-SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/tight/$(ref)/$(strat)/,$(SAMS)))))) $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/loose/hairpin/$(strat)/,$(SAMS)))))) $(tRNA_SAM_FILES)
+SAM_FILES    :=		$(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/tight/hg19.ambig/$(strat)/,$(SAMS)))))) $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(addprefix $(BAMDIR)/$(aligner)/loose/hairpin/$(strat)/,$(SAMS)))))) $(tRNA_SAM_FILES)
 
 
 BAM_FILES:=             $(SAM_FILES:.sam=.bam)
@@ -46,11 +46,13 @@ endef
 $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call align,$(aligner),$(paramSet),$(ref),$(strat)))))))
 
 #we could limit this to just the ref but this is an easier copy-paste job from align
+#-@ INT    number of sorting threads [1]
+#         -m INT    max memory per thread; suffix K/M/G recognized [768M]
 define sam2bam
  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.sam
 	$(SAMTOOLS) view -b -S $$< -t $(REFS)/$(3).fa > $$@
  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam:  $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/%.bam_tmp
-	$(SAMTOOLS) sort $$< $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/$$*
+	$(SAMTOOLS) sort -@ 12 -m 4G $$< $(BAMDIR)/$(1)/$(2)/$(3)/$(4)/$$*
 endef
 
 $(foreach strat,$(STRATEGIES),$(foreach ref,$(REFGENOMES),$(foreach paramSet,$(PARAMSETS),$(foreach aligner,$(ALIGNERS),$(eval $(call sam2bam,$(aligner),$(paramSet),$(ref),$(strat)))))))
@@ -76,6 +78,7 @@ define unique
 	mkdir -p $(BAMDIR)/$(1)/$(2)/$(3)/unique
 	$(SAMTOOLS) view -b -q 1 $$<  > $$@
 endef
+
 
 
 notmirnafiles:=$(addsuffix .notmirna.sorted.txt,$(addprefix $(BAMDIR)/novo/tight/hg19.ambig/all/,$(SAMPLES)))
