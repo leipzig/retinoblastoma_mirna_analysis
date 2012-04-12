@@ -1,0 +1,8 @@
+aligner: novo
+reference: hg19.ambig
+alignmentStringency: tight
+alignmentStrategy: random
+fits: local
+method: per-condition
+sharingMode: maximum
+minCount: 100
