@@ -96,25 +96,27 @@ getCounts <- function (GR,bamPaths, bamSamples, samples,minCount) {
 getCounts2 <- function (GR,bamPaths, bamSamples, samples,minCount,mode) {
   bfl <- BamFileList(bamPaths)
   olap <- summarizeOverlaps(GR, bfl,mode=mode)
-  counts<-as.data.frame(assays(olap)$counts)
+  precounts<-as.data.frame(assays(olap)$counts)
   colnames(counts)<-samples
   #technical replicates
-  counts$WERI<-counts[,'31s8_WERI']+counts[,'36s2_WERI']+counts[,'WERI01_PGM']+counts[,'WERI02_PGM']+counts[,'WERI03_PGM']
-  counts$Y79<-counts[,'36s1_Y79']+counts[,'36s2_Y79']
-  counts$RB525T<-counts[,'RB525T']+counts[,'RB525T01_PGM']+counts[,'RB525T02_PGM']+counts[,'RB525T03_PGM']
-  counts<-counts[,!str_detect(colnames(counts),'^3')]
-  counts<-counts[,!str_detect(colnames(counts),'WERI.*PGM')]
-  counts<-counts[,!str_detect(colnames(counts),'RB525T.*PGM')]
-  #this messes up the id.var so matrix doesn't work
-  
-  #42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T    WERI    Y79 (11 groups)
-  conds<-c('N','N','T','N','T','N','T','T','T','T','T')
-  individual<-c(1,2,2,3,3,4,4,5,6,7,8)
-  replicate<-c(1,1,2,1,2,1,2,2,2,2,2)
-  type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx')
-  paired<-c(FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE)
-  pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual,paired=paired)
-  rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
+  #compute from metadatalayerCake<-data.frame(class=c("exon","tx","intergenic","unmapped"),fraction=c(.02,.25,.50,.23))
+
+#   counts$WERI<-counts[,'31s8_WERI']+counts[,'36s2_WERI']+counts[,'WERI01_PGM']+counts[,'WERI02_PGM']+counts[,'WERI03_PGM']
+#   counts$Y79<-counts[,'36s1_Y79']+counts[,'36s2_Y79']
+#   counts$RB525T<-counts[,'RB525T']+counts[,'RB525T01_PGM']+counts[,'RB525T02_PGM']+counts[,'RB525T03_PGM']
+#   counts<-counts[,!str_detect(colnames(counts),'^3')]
+#   counts<-counts[,!str_detect(colnames(counts),'WERI.*PGM')]
+#   counts<-counts[,!str_detect(colnames(counts),'RB525T.*PGM')]
+#   #this messes up the id.var so matrix doesn't work
+#   
+#   #42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T    WERI    Y79 (11 groups)
+#   conds<-c('N','N','T','N','T','N','T','T','T','T','T')
+#   individual<-c(1,2,2,3,3,4,4,5,6,7,8)
+#   replicate<-c(1,1,2,1,2,1,2,2,2,2,2)
+#   type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx')
+#   paired<-c(FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE)
+#   pdata<-data.frame(condition=conds,replicate=replicate,type=type,individual=individual,paired=paired)
+#   rownames(pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
   
   
   rownames(counts)<-elementMetadata(rowData(olap))$tx_id
@@ -149,42 +151,3 @@ doStats <- function (cds, fits, method, sharingMode) {
   res
 }
 
-Raincatcher <-  function(reads, features, ignore.strand = FALSE, ...)
-{
-  co <- countOverlaps(reads, features, ignore.strand=ignore.strand)
-  if (sum(co) == 0)
-    return(integer(length(features)))
-  
-  counts <- .Raincatcher(reads, features, ignore.strand)
-  names(counts) <- names(features)
-  counts 
-}
-.Raincatcher <- function(reads, features, ignore.strand=FALSE)
-{
-  ## count read if :
-  ## (i)  the read or any one of the read fragments (gapped reads) olaps 
-  ##      any region, but only credit the first
-  
-  fo <- findOverlaps(reads, features, ignore.strand=ignore.strand)
-  
-  mm <- data.frame(query=queryHits(fo), subject=subjectHits(fo))
-  
-  queryRle <- Rle(mm$query)
-  qsingle <- runValue(queryRle)[runLength(queryRle) == 1]
-  singlehits <- mm$subject[mm$query %in% qsingle]
-  qmulti <- runValue(queryRle)[runLength(queryRle) > 1]
-  multi <- mm[mm$query %in% qmulti, ]
-  lst <- split(multi$subject, multi$query)
-  takeFirst<-sapply(lst, function(x) as.integer(x[1]))
-  
-  multihits <- takeFirst
-
-  regions <- c(singlehits, multihits) 
-  
-  counts <- rep(0, length(features))
-  if (length(regions) == 0)
-    return(counts)
-  countsRle <- Rle(sort(regions))
-  counts[runValue(countsRle)] <- runLength(countsRle) 
-  counts
-}

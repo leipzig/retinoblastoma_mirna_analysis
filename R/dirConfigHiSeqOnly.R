@@ -25,25 +25,21 @@ metadata$replicates$RB525T<-c('RB525T','RB525T01_PGM','RB525T02_PGM','RB525T03_P
 metadata$replicates$WERI<-c('31s8_WERI','36s2_WERI','WERI01_PGM','WERI02_PGM','WERI03_PGM')
 metadata$replicates$Y79<-c('36s1_Y79','36s2_Y79')
 #42s1_nrml  RB494N RB494T RB495N  RB495T RB498N RB498T RB517T  RB525T    WERI    Y79 (11 groups)
-metadata$conds<-c('N','N','T','N','T','N','T','T','T','T','T')
-metadata$individual<-c(1,2,2,3,3,4,4,5,6,7,8)
-metadata$replicate<-c(1,1,2,1,2,1,2,2,2,2,2)
-metadata$type<-c('IIfx','HS','HS','HS','HS','HS','HS','HS','HS','IIfx','IIfx')
-metadata$paired<-c(FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE)
+metadata$conds<-c('N','T','N','T','N','T','T','T')
+metadata$individual<-c(1,1,2,2,3,3,4,5)
+metadata$replicate<-c(1,2,1,2,1,2,2,2)
+metadata$type<-c('HS','HS','HS','HS','HS','HS','HS','HS')
+metadata$paired<-c(TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE)
 metadata$pdata<-data.frame(condition=metadata$conds,replicate=metadata$replicate,type=metadata$type,individual=metadata$individual,paired=metadata$paired)
-rownames(metadata$pdata)<-c('42s1_nrml','RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T','WERI','Y79')
+rownames(metadata$pdata)<-c('RB494N','RB494T','RB495N','RB495T','RB498N','RB498T','RB517T','RB525T')
 
-bamPaths<-c(concat(hiseqDataDir,bamDirectory,hiseqsamples,'.bam'),
-            concat(solexaDataDir,bamDirectory,solexasamples,'.bam'),
-            concat(ionDataDir,bamDirectory,ionsamples,'.bam'))
+bamPaths<-c(concat(hiseqDataDir,bamDirectory,hiseqsamples,'.bam'))
 
-readCountPaths<-c(concat(hiseqDataDir,fastqDirectory,hiseqsamples,'.cnt'),
-            concat(solexaDataDir,fastqDirectory,solexasamples,'.cnt'),
-            concat(ionDataDir,fastqDirectory,ionsamples,'.cnt'))
+readCountPaths<-c(concat(hiseqDataDir,fastqDirectory,hiseqsamples,'.cnt'))
 readCounts<-sapply(readCountPaths,scan)
 
-samples<-c(hiseqsamples,solexaprettynames,ionprettynames)
-bamconds<-c(hiseqconds,solexaconds,ionconds)
+samples<-c(hiseqsamples)
+bamconds<-c(hiseqconds)
 
 
 names(bamPaths)<-samples
